@@ -1097,7 +1097,7 @@ app.post('/escalation-collect-phone', (req, res) => {
   g.say({ voice: 'Polly.Danielle-Neural', language: 'en-US' },
     '<speak><prosody rate="85%">And what is the best email address for you?</prosody></speak>'
   );
-  twiml.redirect('/escalation-offer-choice');
+  twiml.redirect('/escalation-collect-email');
   res.type('text/xml').send(twiml.toString());
 });
 
@@ -1375,6 +1375,11 @@ app.post('/intake-confirm-fullname', (req, res) => {
   const sess = getSession(callSid);
   const confirmed = /yes|correct|right|good|that.?s right|yep|yeah|uh.?huh|sounds good|perfect/.test(speech);
   if (!confirmed) {
+        // Frustration counter — escalate after repeated failed confirmations
+    if (incrementFrustration(sess)) {
+      buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm full name after multiple attempts');
+      return res.type('text/xml').send(twiml.toString());
+    }
     const g = gather(twiml, '/intake-spell-name', { input: 'speech', speechTimeout: '3', timeout: 15 });
     say(g, 'No problem! Let me get your name again — please spell your first name, one letter at a time.');
     return res.type('text/xml').send(twiml.toString());
@@ -2110,7 +2115,13 @@ app.post('/refill-verified', async (req, res) => {
 app.post('/refill-confirm-phone', (req, res) => {
   const speech = (req.body.SpeechResult || '').toLowerCase().trim();
   const callSid = req.body.CallSid;
+  const callerPhone = req.body.From || 'anonymous';
   const twiml = new VoiceResponse();
+  const sess = getSession(callSid);
+  if (incrementFrustration(sess) && !/yes|correct|right|good|same/.test(speech)) {
+    buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm phone number after multiple attempts');
+    return res.type('text/xml').send(twiml.toString());
+  }
   if (/no|wrong|changed|different|update/.test(speech)) {
     const g = gather(twiml, '/refill-update-phone', { input: 'speech', speechTimeout: '2', timeout: 12 });
     say(g, "No problem at all! What's your new phone number?");
@@ -2139,7 +2150,13 @@ app.post('/refill-update-phone', async (req, res) => {
 app.post('/refill-confirm-address', (req, res) => {
   const speech = (req.body.SpeechResult || '').toLowerCase().trim();
   const callSid = req.body.CallSid;
+  const callerPhone = req.body.From || 'anonymous';
   const twiml = new VoiceResponse();
+  const sess = getSession(callSid);
+  if (incrementFrustration(sess) && !/yes|correct|right|good|same/.test(speech)) {
+    buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm address after multiple attempts');
+    return res.type('text/xml').send(twiml.toString());
+  }
   if (/no|wrong|changed|different|update|moved/.test(speech)) {
     const g = gather(twiml, '/refill-update-address', { input: 'speech', speechTimeout: '2', timeout: 15 });
     say(g, "Of course! What's your new address? Please include the street, city, and state.");
@@ -2307,6 +2324,11 @@ app.post('/lead-confirm-name', (req, res) => {
   const sess = getSession(callSid);
   const confirmed = /yes|correct|right|good|that.?s right|yep|yeah|uh.?huh|sounds good/.test(speech);
   if (!confirmed) {
+        // Frustration counter — escalate after repeated failed confirmations
+    if (incrementFrustration(sess)) {
+      buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm name after multiple attempts');
+      return res.type('text/xml').send(twiml.toString());
+    }
     const g = gather(twiml, '/lead-collect-name', { input: 'speech', speechTimeout: '2', timeout: 12 });
     say(g, 'No problem! What is your full name?');
     return res.type('text/xml').send(twiml.toString());
@@ -2355,6 +2377,11 @@ app.post('/lead-confirm-email', (req, res) => {
   const confirmed = /yes|correct|right|good|that.?s right|yep|yeah|uh.?huh/.test(speech);
   if (!confirmed) {
     // Re-spell
+        // Frustration counter — escalate after repeated failed confirmations
+    if (incrementFrustration(sess)) {
+      buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm email address after multiple attempts');
+      return res.type('text/xml').send(twiml.toString());
+    }
     const g = gather(twiml, '/lead-spell-email', { input: 'speech', speechTimeout: '4', timeout: 20 });
     say(g, "No problem! Let's try again — please spell your email address one letter at a time, saying at for the at sign and dot for the period.");
     return res.type('text/xml').send(twiml.toString());
@@ -2743,6 +2770,11 @@ app.post('/appt-confirm-fullname', (req, res) => {
   const confirmed = /yes|correct|right|good|that.?s right|yep|yeah|uh.?huh|sounds good|perfect/.test(speech);
   if (!confirmed) {
     // Ask what to fix
+        // Frustration counter — escalate after repeated failed confirmations
+    if (incrementFrustration(sess)) {
+      buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm full name after multiple attempts');
+      return res.type('text/xml').send(twiml.toString());
+    }
     const g = gather(twiml, '/appt-fix-name-part', { input: 'speech', speechTimeout: '2', timeout: 12 });
     say(g, "No problem! Which part would you like to fix — your first name or your last name?");
     return res.type('text/xml').send(twiml.toString());
@@ -2845,6 +2877,11 @@ app.post('/appt-confirm-dob', (req, res) => {
   const sess = getSession(callSid);
   const confirmed = /yes|correct|right|good|that.?s right|yep|yeah|uh.?huh|sounds good/.test(speech);
   if (!confirmed) {
+        // Frustration counter — escalate after repeated failed confirmations
+    if (incrementFrustration(sess)) {
+      buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm date of birth after multiple attempts');
+      return res.type('text/xml').send(twiml.toString());
+    }
     const g = gather(twiml, '/appt-collect-dob', { input: 'speech', speechTimeout: '2', timeout: 12 });
     say(g, "No problem! Let me get your date of birth again — what is it?");
     return res.type('text/xml').send(twiml.toString());
@@ -2959,6 +2996,11 @@ app.post('/appt-confirm-info', async (req, res) => {
   const confirmed = /yes|correct|right|good|that.?s right|yep|yeah|uh.?huh|sounds good|looks good|perfect/.test(speech);
   if (!confirmed) {
     // Caller wants to correct something — ask what needs fixing
+        // Frustration counter — escalate after repeated failed confirmations
+    if (incrementFrustration(sess)) {
+      buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm appointment info after multiple attempts');
+      return res.type('text/xml').send(twiml.toString());
+    }
     const g = gather(twiml, '/appt-confirm-info-fix', { input: 'speech', speechTimeout: '2', timeout: 12 });
     say(g, "No problem at all! What would you like to correct — your name, date of birth, or phone number?");
     return res.type('text/xml').send(twiml.toString());
@@ -2971,8 +3013,13 @@ app.post('/appt-confirm-info', async (req, res) => {
 app.post('/appt-confirm-info-fix', (req, res) => {
   const speech = (req.body.SpeechResult || '').toLowerCase().trim();
   const callSid = req.body.CallSid;
+  const callerPhone = req.body.From || 'anonymous';
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
+  if (!speech || incrementFrustration(sess)) {
+    buildEscalationResponse(twiml, callerPhone, callSid, 'Could not identify what to correct in appointment info');
+    return res.type('text/xml').send(twiml.toString());
+  }
   if (/name|first|last/.test(speech)) {
     const g = gather(twiml, '/appt-collect-name', { input: 'speech', speechTimeout: '2', timeout: 10 });
     say(g, "Of course! Let’s get your name again — what is your first and last name?");
@@ -3109,6 +3156,11 @@ app.post('/appt-confirm-existing-address', async (req, res) => {
   const sess = getSession(callSid);
   const confirmed = /yes|correct|right|good|that.?s right|yep|yeah|uh.?huh/.test(speech);
   if (!confirmed) {
+        // Frustration counter — escalate after repeated failed confirmations
+    if (incrementFrustration(sess)) {
+      buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm address after multiple attempts');
+      return res.type('text/xml').send(twiml.toString());
+    }
     const g = gather(twiml, '/appt-collect-existing-address', { input: 'speech', speechTimeout: '2', timeout: 15 });
     say(g, 'No problem! Let me get your address again — please give me your full address including street, city, state, and zip.');
     return res.type('text/xml').send(twiml.toString());
@@ -3375,6 +3427,11 @@ app.post('/appt-new-confirm-dob', (req, res) => {
   const sess = getSession(callSid);
   const confirmed = /yes|correct|right|good|that.?s right|yep|yeah|uh.?huh/.test(speech);
   if (!confirmed) {
+        // Frustration counter — escalate after repeated failed confirmations
+    if (incrementFrustration(sess)) {
+      buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm date of birth after multiple attempts');
+      return res.type('text/xml').send(twiml.toString());
+    }
     const g = gather(twiml, '/appt-new-collect-dob', { input: 'speech', speechTimeout: '2', timeout: 12 });
     say(g, 'No problem! What is your date of birth?');
     return res.type('text/xml').send(twiml.toString());
@@ -3412,6 +3469,11 @@ app.post('/appt-new-confirm-address', (req, res) => {
   const sess = getSession(callSid);
   const confirmed = /yes|correct|right|good|that.?s right|yep|yeah|uh.?huh/.test(speech);
   if (!confirmed) {
+        // Frustration counter — escalate after repeated failed confirmations
+    if (incrementFrustration(sess)) {
+      buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm address after multiple attempts');
+      return res.type('text/xml').send(twiml.toString());
+    }
     const g = gather(twiml, '/appt-new-collect-address', { input: 'speech', speechTimeout: '2', timeout: 15 });
     say(g, 'No problem! Let me get your address again — please give me your full address including street, city, state, and zip.');
     return res.type('text/xml').send(twiml.toString());
@@ -3492,6 +3554,11 @@ app.post('/appt-new-confirm-emergency', (req, res) => {
   const sess = getSession(callSid);
   const confirmed = /yes|correct|right|good|that.?s right|yep|yeah|uh.?huh|sounds good|perfect/.test(speech);
   if (!confirmed) {
+        // Frustration counter — escalate after repeated failed confirmations
+    if (incrementFrustration(sess)) {
+      buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm emergency contact after multiple attempts');
+      return res.type('text/xml').send(twiml.toString());
+    }
     const g = gather(twiml, '/appt-new-collect-emergency-name', { input: 'speech', speechTimeout: '2', timeout: 15 });
     say(g, "No problem! Let me get that again — what is your emergency contact's full name?");
     return res.type('text/xml').send(twiml.toString());
@@ -3593,6 +3660,11 @@ app.post('/appt-confirm-address', async (req, res) => {
   const sess = getSession(callSid);
   const confirmed = /yes|correct|right|good|that.?s right|yep|yeah|uh.?huh/.test(speech);
   if (!confirmed) {
+        // Frustration counter — escalate after repeated failed confirmations
+    if (incrementFrustration(sess)) {
+      buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm address after multiple attempts');
+      return res.type('text/xml').send(twiml.toString());
+    }
     const g = gather(twiml, '/appt-collect-address', { input: 'speech', speechTimeout: '2', timeout: 15 });
     say(g, "No problem! Let me get your address again — please give me your full address including street, city, state, and zip.");
     return res.type('text/xml').send(twiml.toString());
@@ -3707,6 +3779,11 @@ app.post('/appt-select-slot', (req, res) => {
   else if (digit === '2' || /option 2|second|two/.test(speech)) slotIndex = 1;
   else if (digit === '3' || /option 3|third|three/.test(speech)) slotIndex = 2;
   if (slotIndex === -1 || !sess.offeredSlots || !sess.offeredSlots[slotIndex]) {
+    const callerPhone = req.body.From || 'anonymous';
+    if (incrementFrustration(sess)) {
+      buildEscalationResponse(twiml, callerPhone, callSid, 'Could not select appointment slot after multiple attempts');
+      return res.type('text/xml').send(twiml.toString());
+    }
     const g = gather(twiml, '/appt-select-slot', { input: 'speech dtmf', speechTimeout: '2', timeout: 10 });
     say(g, "Just say option 1, 2, or 3 to choose your time, or say sooner if you need an earlier appointment.");
     return res.type('text/xml').send(twiml.toString());
@@ -3834,11 +3911,20 @@ app.post('/general-help', (req, res) => {
   if (/direction|address|location|park/.test(speech)) {
     twiml.redirect('/directions-info');
   } else if (/hour|open|close|schedule/.test(speech)) {
-    twiml.redirect('/hours-info');
+    say(twiml, "Our office is open Monday through Friday, 8 AM to 5 PM Eastern time. We are closed on weekends and major holidays. If you need to schedule an appointment, I can help you with that right now.");
+    const gHours = gather(twiml, '/main-intent', { timeout: 8 });
+    say(gHours, 'Is there anything else I can help you with today?');
+    twiml.hangup();
   } else if (/portal|patient portal|message/.test(speech)) {
-    twiml.redirect('/portal-info');
+    say(twiml, "You can access the patient portal at Taylor Medical Group dot net — click Patient Portal in the top right corner. From there you can message the doctors directly, view your appointments, request prescription refills, and see your lab results.");
+    const gPortal = gather(twiml, '/main-intent', { timeout: 8 });
+    say(gPortal, 'Is there anything else I can help you with today?');
+    twiml.hangup();
   } else if (/lab|result|test/.test(speech)) {
-    twiml.redirect('/lab-results-info');
+    say(twiml, "Lab results are available through your patient portal at Taylor Medical Group dot net. Click Patient Portal in the top right corner, then go to Lab Results. If your results are not yet posted, please allow 3 to 5 business days after your visit. You can also message the doctors through the portal if you have questions about your results.");
+    const gLab = gather(twiml, '/main-intent', { timeout: 8 });
+    say(gLab, 'Is there anything else I can help you with today?');
+    twiml.hangup();
   } else if (/refill|prescription|medication/.test(speech)) {
     twiml.redirect('/refill-start');
   } else {
