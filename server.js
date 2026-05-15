@@ -3767,45 +3767,82 @@ app.post('/clinic/status', (req, res) => {
   const status = req.body.CallStatus;
   console.log(`[STATUS] ${callSid}: ${status}`);
   if (['completed', 'no-answer', 'busy'].includes(status)) {
+    // Snapshot session data immediately before it gets cleared
     const sess = sessions[callSid];
-    if (sess && sess.callerPhone) {
-      // Build legacy log summary
-      const log = sess.callLog ? sess.callLog.join('\n') : 'No details recorded';
+    const callerPhone = sess && sess.callerPhone;
+    const callLog = sess && sess.callLog ? [...sess.callLog] : [];
+    const callStartTime = sess && sess.callStartTime;
 
-      // Build full transcript from the transcript store
-      const transcript = transcriptStore[callSid];
-      let transcriptText = '';
-      let transcriptHtml = '';
-      if (transcript && transcript.turns && transcript.turns.length > 0) {
-        transcriptText = '\n\n📝 FULL TRANSCRIPT:\n' + transcript.turns.map(t =>
-          `[${t.role.toUpperCase()}] ${t.text}`
-        ).join('\n');
-        transcriptHtml = `
-          <div style="background:#f7fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-top:16px;">
-            <h3 style="margin:0 0 10px;font-size:14px;color:#2d3748;">📝 Full Conversation Transcript</h3>
-            ${transcript.turns.map(t => `
-              <div style="margin:6px 0;padding:8px;border-radius:4px;background:${t.role==='taylor'?'#ebf8ff':'#f0fff4'};">
-                <strong style="color:${t.role==='taylor'?'#2b6cb0':'#276749'};font-size:12px;">${t.role==='taylor'?'🤖 Taylor':'&#128100; Caller'}</strong>
-                <span style="color:#718096;font-size:11px;margin-left:8px;">${t.route}</span><br>
-                <span style="font-size:13px;">${t.text}</span>
-              </div>`).join('')}
-          </div>`;
-        // Mark transcript as finalized
-        transcript.status = status;
-        transcript.end = new Date().toISOString();
-        transcript.duration = sess.callStartTime;
-      }
+    // Respond to Twilio immediately (must be fast)
+    res.sendStatus(204);
 
-      sendCallSummaryToStaff(
-        sess.callerPhone,
-        `Call status: ${status}\nStarted: ${sess.callStartTime || 'unknown'}\n─────────────────────\n${log}${transcriptText}`,
-        callSid,
-        transcriptHtml
-      ).catch(() => {});
+    if (callerPhone) {
+      // Delay 12 seconds so Twilio's /recording-status callback arrives first
+      // This ensures the recording SID is on the session before we build the email
+      setTimeout(async () => {
+        try {
+          const log = callLog.join('\n') || 'No details recorded';
+
+          // Build full transcript from the transcript store
+          const transcript = transcriptStore[callSid];
+          let transcriptText = '';
+          let transcriptHtml = '';
+          if (transcript && transcript.turns && transcript.turns.length > 0) {
+            transcriptText = '\n\n📝 FULL TRANSCRIPT:\n' + transcript.turns.map(t =>
+              `[${t.role.toUpperCase()}] ${t.text}`
+            ).join('\n');
+            transcriptHtml = `
+              <div style="background:#f7fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-top:16px;">
+                <h3 style="margin:0 0 10px;font-size:14px;color:#2d3748;">📝 Full Conversation Transcript</h3>
+                ${transcript.turns.map(t => `
+                  <div style="margin:6px 0;padding:8px;border-radius:4px;background:${t.role==='taylor'?'#ebf8ff':'#f0fff4'};">
+                    <strong style="color:${t.role==='taylor'?'#2b6cb0':'#276749'};font-size:12px;">${t.role==='taylor'?'🤖 Taylor':'&#128100; Caller'}</strong>
+                    <span style="color:#718096;font-size:11px;margin-left:8px;">${t.route}</span><br>
+                    <span style="font-size:13px;">${t.text}</span>
+                  </div>`).join('')}
+              </div>`;
+            transcript.status = status;
+            transcript.end = new Date().toISOString();
+            transcript.duration = callStartTime;
+          }
+
+          // If recording SID still not on session, fetch from Twilio API directly
+          const currentSess = sessions[callSid] || {};
+          if (!currentSess.recordingSid) {
+            try {
+              const recResp = await axios.get(
+                `https://api.twilio.com/2010-04-01/Accounts/${CONFIG.twilio.accountSid}/Recordings.json?CallSid=${callSid}`,
+                { auth: { username: CONFIG.twilio.accountSid, password: CONFIG.twilio.authToken }, timeout: 8000 }
+              );
+              const recs = recResp.data && recResp.data.recordings;
+              if (recs && recs.length > 0) {
+                if (!sessions[callSid]) sessions[callSid] = {};
+                sessions[callSid].recordingSid = recs[0].sid;
+                console.log(`[STATUS] Fetched recording SID from API: ${recs[0].sid}`);
+              }
+            } catch (e) {
+              console.warn('[STATUS] Could not fetch recording from API:', e.message);
+            }
+          }
+
+          await sendCallSummaryToStaff(
+            callerPhone,
+            `Call status: ${status}\nStarted: ${callStartTime || 'unknown'}\n─────────────────────\n${log}${transcriptText}`,
+            callSid,
+            transcriptHtml
+          );
+        } catch (e) {
+          console.error('[STATUS] Error sending post-call summary:', e.message);
+        } finally {
+          clearSession(callSid);
+        }
+      }, 12000); // 12-second delay for recording to arrive
+    } else {
+      clearSession(callSid);
     }
-    clearSession(callSid);
+  } else {
+    res.sendStatus(204);
   }
-  res.sendStatus(204);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
