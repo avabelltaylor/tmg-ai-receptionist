@@ -263,7 +263,22 @@ function setTranscriptCaller(callSid, from) {
 
 // Warm, cheerful voice using Polly Neural
 function say(twiml, text, callSid = null, route = '') {
-  twiml.say({ voice: 'Polly.Danielle-Neural', language: 'en-US' }, text);
+  // Escape XML special chars, then inject strategic pauses after phone numbers and URLs
+  // so callers have time to write them down
+  let escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  // Add 600ms pause after phone numbers (e.g. 678-443-4000)
+  escaped = escaped.replace(/(\d{3}-\d{3}-\d{4})/g, '$1<break time="600ms"/>');
+
+  // Add 500ms pause after website URLs (e.g. taylormedicalgroup.net)
+  escaped = escaped.replace(/(taylormedicalgroup\.net|taylor medical group dot net)/gi, '$1<break time="500ms"/>');
+
+  // Wrap in SSML prosody — 85% rate for medical practice (older patient base)
+  const ssml = `<speak><prosody rate="85%">${escaped}</prosody></speak>`;
+  twiml.say({ voice: 'Polly.Danielle-Neural', language: 'en-US' }, ssml);
   if (callSid) logTurn(callSid, 'taylor', text, route);
 }
 
@@ -421,7 +436,7 @@ async function sendCallSummaryToStaff(callerPhone, summary, callSid = null, tran
       </div>
       ${transcriptHtml}
       <p style="color: #718096; font-size: 12px; margin-top: 16px;">
-        Sent by Tay — Taylor Medical Group Virtual Assistant
+        Sent by Tay — Taylor Medical Group
       </p>
     </div>
   `;
@@ -450,7 +465,7 @@ async function escalateToStaff(callerPhone, reason, details = '') {
       ${details ? `<p><strong>Details:</strong> ${details}</p>` : ''}
       <p><strong>Time:</strong> ${now} ET</p>
       <p style="color: #718096; font-size: 12px; margin-top: 16px;">
-        Sent by Tay — Taylor Medical Group Virtual Assistant
+        Sent by Tay — Taylor Medical Group
       </p>
     </div>
   `;
@@ -500,7 +515,7 @@ async function sendVoicemailToStaff(callerPhone, transcription, recordingUrl) {
         <br/><small style="color:#718096;font-size:11px;">Click to play — no login required</small>
       </p>` : ''}
       <p style="color: #718096; font-size: 12px; margin-top: 16px;">
-        Sent by Tay — Taylor Medical Group Virtual Assistant
+        Sent by Tay — Taylor Medical Group
       </p>
     </div>
   `;
@@ -863,18 +878,57 @@ function toPronouncedName(name) {
 
 // ─── Context-aware escape hatch ───────────────────────────────────────────────
 // Returns { action, intent } where action is 'continue' | 'correct' | 'pivot' | 'exit'
+// ═══════════════════════════════════════════════════════════════════════════════
+// UNIVERSAL ESCAPE — runs on EVERY gather response before any route logic
+// Makes it structurally impossible for Taylor to loop more than 3 turns
+// or hang up on a frustrated caller without collecting contact info first.
+// ═══════════════════════════════════════════════════════════════════════════════
+const STAFF_NAMES = ['winston', 'dr ava', 'dr eldred', 'dr taylor', 'ava', 'eldred', 'dr bell', 'bell taylor'];
+
 function checkEscape(speech, sess, opts = {}) {
   const s = (speech || '').toLowerCase();
-  // Correction signals
-  if (/that.s wrong|i made a mistake|wrong name|wrong number|wrong date|go back|start over|let me change|i need to correct|actually it.?s|no wait|wait no|i said wrong|i meant/.test(s)) {
-    return { action: 'correct' };
-  }
-  // Exit signals
+
+  // --- 1. Hard exit signals ---
   if (/never mind|forget it|that.?s all|i.?m done|no thank you|no thanks|goodbye|bye|hang up/.test(s)) {
     return { action: 'exit' };
   }
-  // Pivot to a different intent — DISABLED for data-entry routes (spelling, DOB, phone, address)
-  // to prevent false positives when caller says a name/word that matches an intent keyword
+
+  // --- 2. Correction signals ---
+  if (/that.s wrong|i made a mistake|wrong name|wrong number|wrong date|go back|start over|let me change|i need to correct|actually it.?s|no wait|wait no|i said wrong|i meant/.test(s)) {
+    return { action: 'correct' };
+  }
+
+  // --- 3. Explicit human/transfer request ---
+  if (/speak to|talk to|live person|live agent|human|operator|front desk|receptionist|someone else|real person|actual person/.test(s)) {
+    return { action: 'escalate', reason: 'caller requested a person' };
+  }
+
+  // --- 4. Staff name request (any named staff member) ---
+  for (const name of STAFF_NAMES) {
+    if (s.includes(name)) {
+      return { action: 'escalate', reason: `caller asked for ${name}` };
+    }
+  }
+
+  // --- 5. Repeated frustration signals — track consecutive 'no' responses ---
+  const isNegative = /^(no|nope|no that.s|that.s not|not right|not correct|not me|not mine|wrong|incorrect|that.s wrong|that is wrong|that.s not right|that is not right|that.s not me|that is not me)/.test(s.trim());
+  if (isNegative) {
+    sess._consecutiveNegatives = (sess._consecutiveNegatives || 0) + 1;
+    if (sess._consecutiveNegatives >= 2) {
+      sess._consecutiveNegatives = 0;
+      return { action: 'escalate', reason: 'caller said no/wrong multiple times' };
+    }
+  } else if (s.length > 3) {
+    // Reset negative counter on any positive/neutral response
+    sess._consecutiveNegatives = 0;
+  }
+
+  // --- 6. Frustration threshold reached ---
+  if ((sess.frustrationCount || 0) >= 3) {
+    return { action: 'escalate', reason: 'frustration threshold reached' };
+  }
+
+  // --- 7. Pivot to a different intent (disabled for data-entry routes) ---
   if (!opts.noPivot) {
     const pivotIntent = detectIntent(speech);
     const currentFlow = sess._currentFlow || '';
@@ -883,6 +937,7 @@ function checkEscape(speech, sess, opts = {}) {
       return { action: 'pivot', intent: pivotIntent };
     }
   }
+
   return { action: 'continue' };
 }
 
@@ -994,19 +1049,18 @@ function buildEscalationResponse(twiml, callerPhone, callSid, reason) {
   const hasContact = sess.firstName && (sess.collectedPhone || sess.callerPhone !== 'anonymous');
   if (hasContact) {
     const g = twiml.gather({ action: '/escalation-choice', method: 'POST', input: 'speech dtmf', speechTimeout: '4', timeout: 15 });
-    g.say({ voice: 'Polly.Joanna', language: 'en-US' },
-      "I'm so sorry for the trouble — I want to make sure you get the help you need. " +
-      "I can take a detailed message right now and have our team call you back, " +
-      "or I can send you a link to our patient portal where you can message the doctors directly. " +
-      "Which would you prefer — a callback message, or the patient portal link?"
+    g.say({ voice: 'Polly.Danielle-Neural', language: 'en-US' },
+      '<speak><prosody rate="85%">I\'m so sorry for the trouble — I want to make sure you get the help you need. ' +
+      'I can take a detailed message right now and have our team call you back, ' +
+      'or I can send you a link to our patient portal where you can message the doctors directly. ' +
+      'Which would you prefer — a callback message, or the patient portal link?</prosody></speak>'
     );
     twiml.redirect('/take-message-content');
   } else {
     // Collect name and callback number first
     const g = twiml.gather({ action: '/escalation-collect-name', method: 'POST', input: 'speech', speechTimeout: '4', timeout: 15 });
-    g.say({ voice: 'Polly.Joanna', language: 'en-US' },
-      "I'm so sorry for the trouble. I want to make sure our team can follow up with you. " +
-      "Could you please tell me your first and last name?"
+    g.say({ voice: 'Polly.Danielle-Neural', language: 'en-US' },
+      '<speak><prosody rate="85%">I\'m so sorry for the trouble. I want to make sure our team can follow up with you. Could you please tell me your first and last name?</prosody></speak>'
     );
     twiml.redirect('/take-message-content');
   }
@@ -1023,8 +1077,8 @@ app.post('/escalation-collect-name', (req, res) => {
   }
   // Now collect callback phone number
   const g = twiml.gather({ action: '/escalation-collect-phone', method: 'POST', input: 'speech dtmf', speechTimeout: '4', timeout: 15 });
-  g.say({ voice: 'Polly.Joanna', language: 'en-US' },
-    `Thank you${speech ? ', ' + speech.split(' ')[0] : ''}. What is the best phone number for our team to reach you?`
+  g.say({ voice: 'Polly.Danielle-Neural', language: 'en-US' },
+    `<speak><prosody rate="85%">Thank you${speech ? ', ' + speech.split(' ')[0] : ''}. What is the best phone number for our team to reach you?</prosody></speak>`
   );
   twiml.redirect('/escalation-collect-email');
   res.type('text/xml').send(twiml.toString());
@@ -1040,8 +1094,8 @@ app.post('/escalation-collect-phone', (req, res) => {
   }
   // Collect email
   const g = twiml.gather({ action: '/escalation-collect-email', method: 'POST', input: 'speech', speechTimeout: '4', timeout: 15 });
-  g.say({ voice: 'Polly.Joanna', language: 'en-US' },
-    'And what is the best email address for you?'
+  g.say({ voice: 'Polly.Danielle-Neural', language: 'en-US' },
+    '<speak><prosody rate="85%">And what is the best email address for you?</prosody></speak>'
   );
   twiml.redirect('/escalation-offer-choice');
   res.type('text/xml').send(twiml.toString());
@@ -1066,9 +1120,8 @@ app.post('/escalation-collect-email', (req, res) => {
   sendCallSummaryToStaff(callerPhone, `Escalated. ${contactSummary}`).catch(() => {});
   // Now offer message or portal
   const g = twiml.gather({ action: '/escalation-choice', method: 'POST', input: 'speech dtmf', speechTimeout: '4', timeout: 15 });
-  g.say({ voice: 'Polly.Joanna', language: 'en-US' },
-    'Thank you! Our team will be in touch. Would you also like to leave a detailed message for the team, ' +
-    'or would you prefer I send you a link to our patient portal where you can message the doctors directly?'
+  g.say({ voice: 'Polly.Danielle-Neural', language: 'en-US' },
+    '<speak><prosody rate="85%">Thank you! Our team will be in touch. Would you also like to leave a detailed message for the team, or would you prefer I send you a link to our patient portal where you can message the doctors directly?</prosody></speak>'
   );
   twiml.redirect('/take-message-content');
   res.type('text/xml').send(twiml.toString());
@@ -1181,7 +1234,7 @@ app.post('/voice', (req, res) => {
   }
 
   // Universal intake gate — collect name before anything else
-  const greeting = "Hi there! Thank you so much for calling Taylor Medical Group — this is Taylor, your virtual assistant, and I am so glad you called! May I start by getting your first and last name?";
+  const greeting = "Hi there! Thank you so much for calling Taylor Medical Group — this is Taylor, and I am so glad you called! May I start by getting your first and last name?";
   const g = gather(twiml, '/intake-firstname', { input: 'speech', speechTimeout: '2', timeout: 15 });
   say(g, greeting, callSid, '/voice');
   twiml.redirect('/voice');
@@ -2480,6 +2533,11 @@ app.post('/appt-select-doctor', (req, res) => {
     twiml.redirect('/main-intent');
     return res.type('text/xml').send(twiml.toString());
   }
+  if (esc.action === 'escalate') {
+    buildEscalationResponse(twiml, req.body.From || sess.callerPhone || 'anonymous', callSid, esc.reason || 'caller needs help');
+    return res.type('text/xml').send(twiml.toString());
+  }
+
 
   // Detect doctor choice — Ava check MUST run first and be broad
   // Covers: "Ava", "Bell", "Ava Taylor", "Dr. Ava", "Dr. Bell", "Dr. Ava Taylor", "Dr. Ava Bell-Taylor"
@@ -2540,6 +2598,11 @@ app.post('/appt-collect-name', (req, res) => {
     twiml.redirect('/main-intent');
     return res.type('text/xml').send(twiml.toString());
   }
+  if (esc.action === 'escalate') {
+    buildEscalationResponse(twiml, req.body.From || sess.callerPhone || 'anonymous', callSid, esc.reason || 'caller needs help');
+    return res.type('text/xml').send(twiml.toString());
+  }
+
   sess.spokenName = speech;
   const g = gather(twiml, '/appt-spell-name', { input: 'speech', speechTimeout: '3', timeout: 15 });
   say(g, pick(AFFIRMATIONS) + ' To make sure I have your name exactly right, could you please spell your first name for me, one letter at a time?');
@@ -2572,6 +2635,11 @@ app.post('/appt-spell-name', (req, res) => {
     twiml.redirect('/main-intent');
     return res.type('text/xml').send(twiml.toString());
   }
+  if (esc.action === 'escalate') {
+    buildEscalationResponse(twiml, req.body.From || sess.callerPhone || 'anonymous', callSid, esc.reason || 'caller needs help');
+    return res.type('text/xml').send(twiml.toString());
+  }
+
   const parsedFirst = normalizeName(speech);
   const cleanFirst = parsedFirst.includes(' ') ? parsedFirst.split(' ')[0] : parsedFirst;
   sess._pendingFirstName = cleanFirst;
@@ -2630,6 +2698,11 @@ app.post('/appt-spell-lastname', (req, res) => {
     twiml.redirect('/main-intent');
     return res.type('text/xml').send(twiml.toString());
   }
+  if (esc.action === 'escalate') {
+    buildEscalationResponse(twiml, req.body.From || sess.callerPhone || 'anonymous', callSid, esc.reason || 'caller needs help');
+    return res.type('text/xml').send(twiml.toString());
+  }
+
   const parsedLast = normalizeName(speech);
   sess._pendingLastName = parsedLast;
   const g = gather(twiml, '/appt-confirm-lastname', { input: 'speech', speechTimeout: '3', timeout: 12 });
@@ -2754,6 +2827,11 @@ app.post('/appt-collect-dob', (req, res) => {
     twiml.redirect('/main-intent');
     return res.type('text/xml').send(twiml.toString());
   }
+  if (esc.action === 'escalate') {
+    buildEscalationResponse(twiml, req.body.From || sess.callerPhone || 'anonymous', callSid, esc.reason || 'caller needs help');
+    return res.type('text/xml').send(twiml.toString());
+  }
+
   sess._pendingDob = speech;
   const g = gather(twiml, '/appt-confirm-dob', { input: 'speech', speechTimeout: '3', timeout: 12 });
   say(g, `I have your date of birth as ${speech} — is that correct?`);
@@ -2809,6 +2887,11 @@ app.post('/appt-collect-phone', (req, res) => {
     twiml.redirect('/main-intent');
     return res.type('text/xml').send(twiml.toString());
   }
+  if (esc.action === 'escalate') {
+    buildEscalationResponse(twiml, req.body.From || sess.callerPhone || 'anonymous', callSid, esc.reason || 'caller needs help');
+    return res.type('text/xml').send(twiml.toString());
+  }
+
   // Store raw speech, read back for confirmation
   const cleanDigits = speech.replace(/\D/g, '').slice(-10);
   const formatted = cleanDigits.length === 10
@@ -3491,6 +3574,11 @@ app.post('/appt-collect-address', (req, res) => {
     twiml.redirect('/main-intent');
     return res.type('text/xml').send(twiml.toString());
   }
+  if (esc.action === 'escalate') {
+    buildEscalationResponse(twiml, req.body.From || sess.callerPhone || 'anonymous', callSid, esc.reason || 'caller needs help');
+    return res.type('text/xml').send(twiml.toString());
+  }
+
   // Read back address for confirmation
   sess._pendingAddress = speech;
   const g = gather(twiml, '/appt-confirm-address', { input: 'speech', speechTimeout: '3', timeout: 12 });
@@ -3832,7 +3920,7 @@ app.post('/nonpatient-message', async (req, res) => {
       <p><strong>Name:</strong> ${callerName}</p>
       <p><strong>Message:</strong></p>
       <blockquote style="border-left:4px solid #2c5282;padding-left:12px;color:#333">${speech}</blockquote>
-      <p style="color:#718096;font-size:12px">Received via Tay — Taylor Medical Group Virtual Assistant</p>
+      <p style="color:#718096;font-size:12px">Received via Tay — Taylor Medical Group</p>
     </div>`, body).catch(() => {});
   sendCallSummaryToStaff(callerPhone, `Reason: Non-patient message\nCaller: ${callerName}\nMessage: ${speech}\nOutcome: Staff emailed`).catch(() => {});
   say(twiml, "Perfect! I've sent your message to our team and they'll follow up with you. Is there anything else I can help you with today?");
@@ -4406,7 +4494,7 @@ app.post('/pharmacy-message', async (req, res) => {
       <p style="${needsApptWarning ? 'color:#c53030;font-weight:bold' : 'color:#276749'}">${lastApptNote}</p>
       ${needsApptWarning ? '<p style="color:#c53030"><strong>⚠️ Action Required:</strong> Patient may need to schedule an appointment or retest labs before this refill can be processed. Please review and advise the pharmacy accordingly.</p>' : ''}
       <hr style="margin:20px 0">
-      <p style="color:#718096;font-size:12px">Received via Tay — Taylor Medical Group Virtual Assistant — ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })}</p>
+      <p style="color:#718096;font-size:12px">Received via Tay — Taylor Medical Group — ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })}</p>
     </div>`;
   const textBody = `PHARMACY REQUEST
 
@@ -4649,14 +4737,14 @@ app.post('/silence-check', (req, res) => {
   const attempt = parseInt(req.body.attempt || '1', 10);
   if (attempt >= 2) {
     // Second silence - hang up gracefully
-    twiml.say({ voice: 'Polly.Joanna-Neural', language: 'en-US' },
-      "We haven't heard from you, so we'll let you go for now. Please call us back at 678-443-4000 anytime. Have a wonderful day!");
+    twiml.say({ voice: 'Polly.Danielle-Neural', language: 'en-US' },
+      '<speak><prosody rate="85%">We haven\'t heard from you, so we\'ll let you go for now. Please call us back at 678-443-4000 anytime. Have a wonderful day!</prosody></speak>');
     twiml.hangup();
   } else {
     // First silence - ask if still there
     const g = twiml.gather({ input: 'speech', speechTimeout: '3', timeout: 10, action: `/silence-check?attempt=2`, method: 'POST' });
-    g.say({ voice: 'Polly.Joanna-Neural', language: 'en-US' },
-      "Are you still there? Take your time — I'm here whenever you're ready.");
+    g.say({ voice: 'Polly.Danielle-Neural', language: 'en-US' },
+      '<speak><prosody rate="85%">Are you still there? Take your time — I\'m here whenever you\'re ready.</prosody></speak>');
   }
   res.type('text/xml').send(twiml.toString());
 });
