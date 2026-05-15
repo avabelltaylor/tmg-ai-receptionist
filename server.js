@@ -7,6 +7,8 @@ require('dotenv').config();
 const express = require('express');
 const twilio = require('twilio');
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 const app = express();
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
@@ -134,23 +136,128 @@ function getTwilioClient() {
 }
 
 // ─── Transcript store — keeps last 48h of call transcripts in memory ─────────
-const transcriptStore = {}; // { callSid: { from, start, turns: [{role,text,route,ts}] } }
+// ═══════════════════════════════════════════════════════════════════════════════
+// PERSISTENT TRANSCRIPT STORAGE
+// Transcripts are written to /data/transcripts.jsonl (Railway volume) on every
+// turn so they survive restarts, redeploys, and crashes.
+// On startup, the last 48h of transcripts are loaded back into memory.
+// ═══════════════════════════════════════════════════════════════════════════════
+const DATA_DIR = process.env.DATA_DIR || '/data';
+const TRANSCRIPT_FILE = path.join(DATA_DIR, 'transcripts.jsonl');
+const TRANSCRIPT_WRITE_QUEUE = [];
+let TRANSCRIPT_WRITE_IN_PROGRESS = false;
+
+// Ensure /data directory exists (Railway volume or local fallback)
+try {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  console.log(`[TRANSCRIPT] Persistent storage at: ${TRANSCRIPT_FILE}`);
+} catch (e) {
+  console.warn(`[TRANSCRIPT] Could not create ${DATA_DIR}: ${e.message} — using memory only`);
+}
+
+// Crash-safe async write: queues writes and flushes one at a time
+function persistTurn(entry) {
+  TRANSCRIPT_WRITE_QUEUE.push(entry);
+  flushTranscriptQueue();
+}
+
+async function flushTranscriptQueue() {
+  if (TRANSCRIPT_WRITE_IN_PROGRESS || TRANSCRIPT_WRITE_QUEUE.length === 0) return;
+  TRANSCRIPT_WRITE_IN_PROGRESS = true;
+  while (TRANSCRIPT_WRITE_QUEUE.length > 0) {
+    const entry = TRANSCRIPT_WRITE_QUEUE.shift();
+    try {
+      fs.appendFileSync(TRANSCRIPT_FILE, JSON.stringify(entry) + '\n', 'utf8');
+    } catch (e) {
+      console.error('[TRANSCRIPT] Write error:', e.message);
+    }
+  }
+  TRANSCRIPT_WRITE_IN_PROGRESS = false;
+}
+
+// Load last 48h of transcripts from disk into memory on startup
+const transcriptStore = {};
+(function loadTranscriptsFromDisk() {
+  try {
+    if (!fs.existsSync(TRANSCRIPT_FILE)) {
+      console.log('[TRANSCRIPT] No existing transcript file — starting fresh');
+      return;
+    }
+    const cutoff = Date.now() - 48 * 60 * 60 * 1000;
+    const lines = fs.readFileSync(TRANSCRIPT_FILE, 'utf8').split('\n').filter(Boolean);
+    let loaded = 0;
+    for (const line of lines) {
+      try {
+        const entry = JSON.parse(line);
+        if (!entry.callSid || !entry.ts) continue;
+        if (new Date(entry.ts).getTime() < cutoff) continue; // skip old entries
+        if (!transcriptStore[entry.callSid]) {
+          transcriptStore[entry.callSid] = { callSid: entry.callSid, from: entry.from || '', start: entry.ts, turns: [] };
+        }
+        transcriptStore[entry.callSid].turns.push({
+          role: entry.role,
+          text: entry.text,
+          route: entry.route,
+          ts: entry.ts
+        });
+        loaded++;
+      } catch (_) {}
+    }
+    console.log(`[TRANSCRIPT] Restored ${loaded} turns from disk (${Object.keys(transcriptStore).length} calls)`);
+  } catch (e) {
+    console.error('[TRANSCRIPT] Failed to load from disk:', e.message);
+  }
+})();
+
+// Rotate transcript file daily — keep last 7 days, archive older entries
+function rotateTranscriptFile() {
+  try {
+    if (!fs.existsSync(TRANSCRIPT_FILE)) return;
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const lines = fs.readFileSync(TRANSCRIPT_FILE, 'utf8').split('\n').filter(Boolean);
+    const kept = lines.filter(line => {
+      try { return new Date(JSON.parse(line).ts).getTime() > cutoff; } catch (_) { return false; }
+    });
+    if (kept.length < lines.length) {
+      fs.writeFileSync(TRANSCRIPT_FILE, kept.join('\n') + (kept.length ? '\n' : ''), 'utf8');
+      console.log(`[TRANSCRIPT] Rotated file: kept ${kept.length}/${lines.length} entries`);
+    }
+  } catch (e) {
+    console.error('[TRANSCRIPT] Rotation error:', e.message);
+  }
+}
+setInterval(rotateTranscriptFile, 6 * 60 * 60 * 1000); // rotate every 6 hours
 
 function logTurn(callSid, role, text, route = '') {
   if (!callSid || !text) return;
   if (!transcriptStore[callSid]) {
     transcriptStore[callSid] = { callSid, from: '', start: new Date().toISOString(), turns: [] };
   }
-  transcriptStore[callSid].turns.push({
-    role,           // 'taylor' | 'caller'
+  const turn = {
+    callSid,
+    from: transcriptStore[callSid].from || '',
+    role,
     text: text.slice(0, 500),
     route: route.replace(/.*\//, '/'),
     ts: new Date().toISOString()
-  });
-  // Prune transcripts older than 48h
+  };
+  transcriptStore[callSid].turns.push(turn);
+  // Write-through to disk immediately
+  persistTurn(turn);
+  // Prune in-memory store — keep last 48h only
   const cutoff = Date.now() - 48 * 60 * 60 * 1000;
   for (const sid of Object.keys(transcriptStore)) {
     if (new Date(transcriptStore[sid].start).getTime() < cutoff) delete transcriptStore[sid];
+  }
+}
+
+// Update caller phone on transcript when session identifies the caller
+function setTranscriptCaller(callSid, from) {
+  if (!callSid || !from) return;
+  if (!transcriptStore[callSid]) {
+    transcriptStore[callSid] = { callSid, from, start: new Date().toISOString(), turns: [] };
+  } else {
+    transcriptStore[callSid].from = from;
   }
 }
 
@@ -867,8 +974,136 @@ async function bookAppointment(clientId, serviceId, utcMs, practitionerId) {
 
 // ─── Sessions ────────────────────────────────────────────────────────────────
 const sessions = {};
-function getSession(callSid) { if (!sessions[callSid]) sessions[callSid] = {}; return sessions[callSid]; }
+function getSession(callSid) { if (!sessions[callSid]) sessions[callSid] = { frustrationCount: 0 }; return sessions[callSid]; }
 function clearSession(callSid) { delete sessions[callSid]; }
+
+// ─── Frustration counter — increment on every failed confirmation ────────────
+// Returns true if threshold reached (caller should be escalated)
+function incrementFrustration(sess) {
+  sess.frustrationCount = (sess.frustrationCount || 0) + 1;
+  return sess.frustrationCount >= 3;
+}
+
+// Build escalation TwiML — collect contact info first, then offer message or portal
+function buildEscalationResponse(twiml, callerPhone, callSid, reason) {
+  const sess = getSession(callSid);
+  sess._escalationReason = reason;
+  const nameHint = [sess.firstName, sess.lastName].filter(Boolean).join(' ') || 'unknown';
+  escalateToStaff(callerPhone, `⚠️ Taylor needs help — ${reason}`, `Caller: ${callerPhone}\nName collected so far: ${nameHint}\nReason: ${reason}`).catch(() => {});
+  // If we already have name + phone, skip straight to message/portal choice
+  const hasContact = sess.firstName && (sess.collectedPhone || sess.callerPhone !== 'anonymous');
+  if (hasContact) {
+    const g = twiml.gather({ action: '/escalation-choice', method: 'POST', input: 'speech dtmf', speechTimeout: '4', timeout: 15 });
+    g.say({ voice: 'Polly.Joanna', language: 'en-US' },
+      "I'm so sorry for the trouble — I want to make sure you get the help you need. " +
+      "I can take a detailed message right now and have our team call you back, " +
+      "or I can send you a link to our patient portal where you can message the doctors directly. " +
+      "Which would you prefer — a callback message, or the patient portal link?"
+    );
+    twiml.redirect('/take-message-content');
+  } else {
+    // Collect name and callback number first
+    const g = twiml.gather({ action: '/escalation-collect-name', method: 'POST', input: 'speech', speechTimeout: '4', timeout: 15 });
+    g.say({ voice: 'Polly.Joanna', language: 'en-US' },
+      "I'm so sorry for the trouble. I want to make sure our team can follow up with you. " +
+      "Could you please tell me your first and last name?"
+    );
+    twiml.redirect('/take-message-content');
+  }
+}
+
+// ─── Escalation contact collection ─────────────────────────────────────────────
+app.post('/escalation-collect-name', (req, res) => {
+  const speech = (req.body.SpeechResult || '').trim();
+  const callSid = req.body.CallSid;
+  const twiml = new VoiceResponse();
+  const sess = getSession(callSid);
+  if (speech) {
+    sess._escalationName = speech;
+  }
+  // Now collect callback phone number
+  const g = twiml.gather({ action: '/escalation-collect-phone', method: 'POST', input: 'speech dtmf', speechTimeout: '4', timeout: 15 });
+  g.say({ voice: 'Polly.Joanna', language: 'en-US' },
+    `Thank you${speech ? ', ' + speech.split(' ')[0] : ''}. What is the best phone number for our team to reach you?`
+  );
+  twiml.redirect('/escalation-collect-email');
+  res.type('text/xml').send(twiml.toString());
+});
+
+app.post('/escalation-collect-phone', (req, res) => {
+  const speech = (req.body.SpeechResult || '').trim();
+  const callSid = req.body.CallSid;
+  const twiml = new VoiceResponse();
+  const sess = getSession(callSid);
+  if (speech) {
+    sess._escalationPhone = speech;
+  }
+  // Collect email
+  const g = twiml.gather({ action: '/escalation-collect-email', method: 'POST', input: 'speech', speechTimeout: '4', timeout: 15 });
+  g.say({ voice: 'Polly.Joanna', language: 'en-US' },
+    'And what is the best email address for you?'
+  );
+  twiml.redirect('/escalation-offer-choice');
+  res.type('text/xml').send(twiml.toString());
+});
+
+app.post('/escalation-collect-email', (req, res) => {
+  const speech = (req.body.SpeechResult || '').trim();
+  const callSid = req.body.CallSid;
+  const callerPhone = req.body.From || 'anonymous';
+  const twiml = new VoiceResponse();
+  const sess = getSession(callSid);
+  if (speech) {
+    sess._escalationEmail = speech;
+  }
+  // Notify staff with full contact info now
+  const contactSummary =
+    `Name: ${sess._escalationName || sess.firstName || 'unknown'}\n` +
+    `Phone: ${sess._escalationPhone || sess.collectedPhone || callerPhone}\n` +
+    `Email: ${sess._escalationEmail || 'not provided'}\n` +
+    `Reason: ${sess._escalationReason || 'escalated from call'}`;
+  escalateToStaff(callerPhone, `⚠️ Follow-up needed — ${sess._escalationReason || 'caller needs help'}`, contactSummary).catch(() => {});
+  sendCallSummaryToStaff(callerPhone, `Escalated. ${contactSummary}`).catch(() => {});
+  // Now offer message or portal
+  const g = twiml.gather({ action: '/escalation-choice', method: 'POST', input: 'speech dtmf', speechTimeout: '4', timeout: 15 });
+  g.say({ voice: 'Polly.Joanna', language: 'en-US' },
+    'Thank you! Our team will be in touch. Would you also like to leave a detailed message for the team, ' +
+    'or would you prefer I send you a link to our patient portal where you can message the doctors directly?'
+  );
+  twiml.redirect('/take-message-content');
+  res.type('text/xml').send(twiml.toString());
+});
+
+// ─── Escalation choice handler ────────────────────────────────────────────────
+app.post('/escalation-choice', (req, res) => {
+  const speech = (req.body.SpeechResult || '').toLowerCase().trim();
+  const callSid = req.body.CallSid;
+  const twiml = new VoiceResponse();
+  const sess = getSession(callSid);
+  const wantsPortal = /portal|link|email|message.*doctor|message.*doctor|online|website/.test(speech);
+  const wantsCallback = /message|call.*back|callback|leave.*message|someone.*call|call.*me|team|staff|person/.test(speech);
+  if (wantsPortal && !wantsCallback) {
+    // Send portal link and explain
+    const patientEmail = sess.patientRecord?.Email || null;
+    if (patientEmail) {
+      sendPortalLinkToPatient(patientEmail, nameHint(sess)).catch(() => {});
+      say(twiml, `Perfect! I've just sent the patient portal link to your email on file. Please check your inbox for an email from us. At the portal you can message the doctors directly, view your appointments, and see your prescription history. The portal address is Taylor Medical Group dot net — click Patient Portal in the top right corner.`);
+    } else {
+      say(twiml, `Of course! Please visit Taylor Medical Group dot net and click Patient Portal in the top right corner to message our doctors directly. You can also reach us through the portal for appointments, prescriptions, and lab results.`);
+    }
+    const g = twiml.gather({ action: '/main-intent', input: 'speech', speechTimeout: '2', timeout: 8 });
+    say(g, 'Is there anything else I can help you with today?');
+    twiml.hangup();
+  } else {
+    // Default — take a message
+    twiml.redirect('/take-message-content');
+  }
+  res.type('text/xml').send(twiml.toString());
+});
+
+function nameHint(sess) {
+  return [sess.firstName, sess.lastName].filter(Boolean).join(' ') || 'Patient';
+}
 
 // ─── Intent detection ────────────────────────────────────────────────────────
 function detectIntent(speech) {
@@ -911,8 +1146,9 @@ app.post('/voice', (req, res) => {
   sess.callStartTime = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
   sess.callLog = [];
 
-  // Initialize transcript entry for this call
+  // Initialize transcript entry for this call and persist caller identity to disk
   transcriptStore[callSid] = { callSid, from: callerPhone, start: new Date().toISOString(), turns: [] };
+  setTranscriptCaller(callSid, callerPhone);
 
   // ── Enable call recording for every inbound call via REST API (avoids TwiML validation issues) ──
   // We trigger the recording via Twilio REST API after call connects, not via TwiML <Record>
@@ -995,6 +1231,7 @@ app.post('/intake-spell-name', (req, res) => {
 app.post('/intake-confirm-firstname', (req, res) => {
   const speech = (req.body.SpeechResult || '').toLowerCase().trim();
   const callSid = req.body.CallSid;
+  const callerPhone = req.body.From || 'anonymous';
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   const confirmed = /yes|correct|right|good|that.?s right|yep|yeah|uh.?huh/.test(speech);
@@ -1008,6 +1245,11 @@ app.post('/intake-confirm-firstname', (req, res) => {
       sess._pendingFirstName = cleanFirst;
       const g = gather(twiml, '/intake-confirm-firstname', { input: 'speech', speechTimeout: '3', timeout: 12 });
       say(g, `Got it! I have your first name as ${cleanFirst} — is that correct?`);
+      return res.type('text/xml').send(twiml.toString());
+    }
+    // Frustration counter — escalate after 2 failed first name confirmations
+    if (incrementFrustration(sess)) {
+      buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm first name after multiple attempts');
       return res.type('text/xml').send(twiml.toString());
     }
     const g = gather(twiml, '/intake-spell-name', { input: 'speech', speechTimeout: '3', timeout: 15 });
@@ -1041,6 +1283,7 @@ app.post('/intake-spell-lastname', (req, res) => {
 app.post('/intake-confirm-lastname', (req, res) => {
   const speech = (req.body.SpeechResult || '').toLowerCase().trim();
   const callSid = req.body.CallSid;
+  const callerPhone = req.body.From || 'anonymous';
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   const confirmed = /yes|correct|right|good|that.?s right|yep|yeah|uh.?huh/.test(speech);
@@ -1052,6 +1295,11 @@ app.post('/intake-confirm-lastname', (req, res) => {
       sess._pendingLastName = parsedLast;
       const g = gather(twiml, '/intake-confirm-lastname', { input: 'speech', speechTimeout: '3', timeout: 12 });
       say(g, `Got it! I have your last name as ${parsedLast} — is that correct?`);
+      return res.type('text/xml').send(twiml.toString());
+    }
+    // Frustration counter — escalate after repeated last name failures
+    if (incrementFrustration(sess)) {
+      buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm last name after multiple attempts');
       return res.type('text/xml').send(twiml.toString());
     }
     const g = gather(twiml, '/intake-spell-lastname', { input: 'speech', speechTimeout: '3', timeout: 15 });
@@ -2335,10 +2583,15 @@ app.post('/appt-spell-name', (req, res) => {
 app.post('/appt-confirm-firstname', (req, res) => {
   const speech = (req.body.SpeechResult || '').toLowerCase().trim();
   const callSid = req.body.CallSid;
+  const callerPhone = req.body.From || 'anonymous';
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   const confirmed = /yes|correct|right|good|that.?s right|yep|yeah|uh.?huh|sounds good/.test(speech);
   if (!confirmed) {
+    if (incrementFrustration(sess)) {
+      buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm first name after multiple attempts');
+      return res.type('text/xml').send(twiml.toString());
+    }
     const g = gather(twiml, '/appt-spell-name', { input: 'speech', speechTimeout: '3', timeout: 15 });
     say(g, "No problem! Let me get your first name again — could you spell it for me, one letter at a time?");
     return res.type('text/xml').send(twiml.toString());
@@ -2387,10 +2640,15 @@ app.post('/appt-spell-lastname', (req, res) => {
 app.post('/appt-confirm-lastname', (req, res) => {
   const speech = (req.body.SpeechResult || '').toLowerCase().trim();
   const callSid = req.body.CallSid;
+  const callerPhone = req.body.From || 'anonymous';
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   const confirmed = /yes|correct|right|good|that.?s right|yep|yeah|uh.?huh|sounds good/.test(speech);
   if (!confirmed) {
+    if (incrementFrustration(sess)) {
+      buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm last name after multiple attempts');
+      return res.type('text/xml').send(twiml.toString());
+    }
     const g = gather(twiml, '/appt-spell-lastname', { input: 'speech', speechTimeout: '3', timeout: 15 });
     say(g, "No problem! Let me get your last name again — could you spell it for me, one letter at a time?");
     return res.type('text/xml').send(twiml.toString());
@@ -2571,12 +2829,18 @@ app.post('/appt-collect-phone', (req, res) => {
 app.post('/appt-confirm-phone', async (req, res) => {
   const speech = (req.body.SpeechResult || '').toLowerCase().trim();
   const callSid = req.body.CallSid;
+  const callerPhone = req.body.From || 'anonymous';
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   const confirmed = /yes|correct|right|good|that.?s right|yep|yeah|uh.?huh/.test(speech);
   if (!confirmed) {
+    // Escalate after 2 failed phone confirmations — prevents the Angela Cox loop
+    if (incrementFrustration(sess)) {
+      buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm phone number after multiple attempts');
+      return res.type('text/xml').send(twiml.toString());
+    }
     const g = gather(twiml, '/appt-collect-phone', { input: 'speech', speechTimeout: '2', timeout: 12 });
-    say(g, "No problem! Let me get your phone number again — what is it?");
+    say(g, "No problem! Let me get your phone number again — please say each digit slowly.");
     return res.type('text/xml').send(twiml.toString());
   }
   sess.collectedPhone = sess._pendingPhone;
