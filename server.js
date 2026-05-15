@@ -448,7 +448,19 @@ app.get('/recording/:sid', async (req, res) => {
     res.status(404).send('Recording not found or expired');
   }
 });
-app.get('/health', (req, res) => res.json({ status: 'healthy', uptime: process.uptime() }));
+// ─── Health check endpoint — Railway uses this to verify the service is alive ──
+// Returns 200 with uptime, version, and timestamp. Railway health check is
+// configured to hit this endpoint every 30s; 3 consecutive failures = restart.
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    service: 'tmg-ai-receptionist',
+    version: 'v7.39',
+    uptime: Math.round(process.uptime()),
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'production',
+  });
+});
 
 // ── /call-logs — Recent calls to Taylor's number ──────────────────────────────
 // GET https://tmg-ai-receptionist-production.up.railway.app/call-logs
@@ -4582,11 +4594,108 @@ function scheduleDailyFormCheck() {
   }, msUntilFirst);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// SAFEGUARD SYSTEM — Keeps Taylor alive and alerts staff if she goes down
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. Self-ping every 4 minutes — prevents Railway from sleeping the service
+//    and detects if the HTTP server stops responding.
+// 2. Watchdog alert — if 3 consecutive self-pings fail, emails staff immediately.
+// 3. Startup confirmation — emails staff when Taylor comes online after a restart.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const SELF_URL = process.env.RAILWAY_PUBLIC_DOMAIN
+  ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+  : `https://tmg-ai-receptionist-production.up.railway.app`;
+
+let _pingFailures = 0;
+let _lastPingSuccess = Date.now();
+let _downtimeAlertSent = false;
+
+async function selfPing() {
+  try {
+    const r = await axios.get(`${SELF_URL}/health`, { timeout: 10000 });
+    if (r.status === 200 && r.data && r.data.status === 'healthy') {
+      if (_pingFailures >= 3 && _downtimeAlertSent) {
+        // Recovery — service came back up
+        console.log('[WATCHDOG] Self-ping recovered after', _pingFailures, 'failures');
+        const recoveryHtml = `<div style="font-family:Arial,sans-serif;padding:24px;">
+          <h2 style="color:#276749;">✅ Tay — Service Recovered</h2>
+          <p>Taylor's AI receptionist is back online after a period of failed health checks.</p>
+          <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+            <tr><td style="padding:8px;font-weight:bold;">Recovery Time:</td><td style="padding:8px;">${new Date().toLocaleString('en-US',{timeZone:'America/New_York'})}</td></tr>
+            <tr style="background:#f7fafc;"><td style="padding:8px;font-weight:bold;">Downtime Duration:</td><td style="padding:8px;">~${Math.round((Date.now()-_lastPingSuccess)/60000)} minutes</td></tr>
+            <tr><td style="padding:8px;font-weight:bold;">Failed Pings:</td><td style="padding:8px;">${_pingFailures}</td></tr>
+          </table>
+          <p style="color:#276749;">Taylor is now accepting calls normally.</p>
+        </div>`;
+        await sendEmail('✅ Tay — Service Recovered', recoveryHtml, `Taylor AI receptionist has recovered. Was down ~${Math.round((Date.now()-_lastPingSuccess)/60000)} minutes.`).catch(()=>{});
+        _downtimeAlertSent = false;
+      }
+      _pingFailures = 0;
+      _lastPingSuccess = Date.now();
+    } else {
+      throw new Error(`Unexpected health response: ${r.status}`);
+    }
+  } catch (err) {
+    _pingFailures++;
+    console.error(`[WATCHDOG] Self-ping FAILED (${_pingFailures}/3):`, err.message);
+    if (_pingFailures >= 3 && !_downtimeAlertSent) {
+      _downtimeAlertSent = true;
+      console.error('[WATCHDOG] 3 consecutive failures — sending downtime alert to staff');
+      const downtimeHtml = `<div style="font-family:Arial,sans-serif;padding:24px;">
+        <h2 style="color:#c53030;">🚨 URGENT: Tay (AI Receptionist) May Be Down</h2>
+        <p>Taylor's AI receptionist has failed <strong>3 consecutive health checks</strong> and may not be answering calls.</p>
+        <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+          <tr><td style="padding:8px;font-weight:bold;">Alert Time:</td><td style="padding:8px;">${new Date().toLocaleString('en-US',{timeZone:'America/New_York'})}</td></tr>
+          <tr style="background:#fff5f5;"><td style="padding:8px;font-weight:bold;">Last Successful Ping:</td><td style="padding:8px;">${new Date(_lastPingSuccess).toLocaleString('en-US',{timeZone:'America/New_York'})}</td></tr>
+          <tr><td style="padding:8px;font-weight:bold;">Consecutive Failures:</td><td style="padding:8px;">${_pingFailures}</td></tr>
+          <tr style="background:#fff5f5;"><td style="padding:8px;font-weight:bold;">Error:</td><td style="padding:8px;">${err.message}</td></tr>
+          <tr><td style="padding:8px;font-weight:bold;">Service URL:</td><td style="padding:8px;">${SELF_URL}</td></tr>
+        </table>
+        <p style="color:#c53030;font-weight:bold;">⚠️ Incoming patient calls may be going unanswered. Please check Railway immediately:</p>
+        <p><a href="https://railway.com/project/4cf8df8f-53ec-4537-aba2-c47e99799c69/service/fd56ee17-7e7e-4812-8769-6478027fc050" style="color:#2b6cb0;">Open Railway Dashboard → tmg-ai-receptionist</a></p>
+        <p style="color:#718096;font-size:12px;">This alert was sent by the watchdog running inside the service itself. If Railway restarted the service, a recovery email will follow.</p>
+      </div>`;
+      await sendEmail('🚨 URGENT: Tay AI Receptionist May Be Down', downtimeHtml, `URGENT: Taylor AI receptionist failed 3 health checks. Calls may be going unanswered. Check Railway immediately.`).catch(()=>{});
+    }
+  }
+}
+
+// Start self-ping watchdog — runs every 4 minutes
+function startWatchdog() {
+  // First ping after 60 seconds (let service fully initialize)
+  setTimeout(() => {
+    selfPing();
+    setInterval(selfPing, 4 * 60 * 1000); // every 4 minutes
+  }, 60000);
+  console.log('[WATCHDOG] Self-ping watchdog started — pinging every 4 minutes');
+}
+
+async function sendStartupAlert() {
+  const html = `<div style="font-family:Arial,sans-serif;padding:24px;">
+    <h2 style="color:#2c5282;">✅ Tay — AI Receptionist Online</h2>
+    <p>Taylor's AI receptionist has started successfully and is now accepting calls.</p>
+    <table style="width:100%;border-collapse:collapse;margin:16px 0;">
+      <tr><td style="padding:8px;font-weight:bold;">Start Time:</td><td style="padding:8px;">${new Date().toLocaleString('en-US',{timeZone:'America/New_York'})}</td></tr>
+      <tr style="background:#f7fafc;"><td style="padding:8px;font-weight:bold;">Version:</td><td style="padding:8px;">v7.39</td></tr>
+      <tr><td style="padding:8px;font-weight:bold;">Phone Number:</td><td style="padding:8px;">(404) 736-6917</td></tr>
+      <tr style="background:#f7fafc;"><td style="padding:8px;font-weight:bold;">Service URL:</td><td style="padding:8px;">${SELF_URL}</td></tr>
+      <tr><td style="padding:8px;font-weight:bold;">Watchdog:</td><td style="padding:8px;">Active — pinging every 4 minutes</td></tr>
+    </table>
+    <p style="color:#276749;">All systems operational. Smoke tests will run in 45 seconds.</p>
+  </div>`;
+  await sendEmail('✅ Tay — AI Receptionist Started', html, 'Taylor AI receptionist started successfully and is now accepting calls.').catch(()=>{});
+}
+
 app.listen(PORT, () => {
-  console.log(`TMG AI Receptionist v7.36 "Taylor" running on port ${PORT}`);
+  console.log(`TMG AI Receptionist v7.39 "Taylor" running on port ${PORT}`);
+  // Send startup confirmation email to staff
+  setTimeout(sendStartupAlert, 5000);
   // Run smoke test 45 seconds after startup to allow Railway to fully initialize
   setTimeout(runSmokeTests, 45000);
   // Schedule daily 8 AM intake form check
   scheduleDailyFormCheck();
+  // Start self-ping watchdog to keep service alive and alert on downtime
+  startWatchdog();
 });
 module.exports = app;
