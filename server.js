@@ -933,7 +933,7 @@ app.post('/voice', (req, res) => {
   }
 
   // Universal intake gate — collect name before anything else
-  const greeting = "Hi there! Thank you so much for calling Taylor Medical Group — this is Tay, your virtual assistant, and I am so glad you called! May I start by getting your first and last name?";
+  const greeting = "Hi there! Thank you so much for calling Taylor Medical Group — this is Taylor, your virtual assistant, and I am so glad you called! May I start by getting your first and last name?";
   const g = gather(twiml, '/intake-firstname', { input: 'speech', speechTimeout: '2', timeout: 15 });
   say(g, greeting, callSid, '/voice');
   twiml.redirect('/voice');
