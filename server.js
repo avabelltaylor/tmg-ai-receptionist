@@ -425,11 +425,12 @@ function gather(twiml, action, opts = {}) {
   return twiml.gather({
     action, method: 'POST',
     input: 'speech dtmf',
-    speechTimeout: '3',
+    speechTimeout: 'auto',   // 'auto' waits for natural pause instead of fixed silence
     speechModel: 'phone_call',
     enhanced: 'true',
     hints: SPEECH_HINTS.join(','),
     timeout: 10,
+    actionOnEmptyResult: 'true', // prevent looping on silence/noise with no speech result
     ...opts,
   });
 }
@@ -1288,7 +1289,7 @@ function buildEscalationResponse(twiml, callerPhone, callSid, reason) {
   // If we already have name + phone, skip straight to message/portal choice
   const hasContact = sess.firstName && (sess.collectedPhone || sess.callerPhone !== 'anonymous');
   if (hasContact) {
-    const g = twiml.gather({ action: '/escalation-choice', method: 'POST', input: 'speech dtmf', speechTimeout: '4', timeout: 15 });
+    const g = twiml.gather({ action: '/escalation-choice', method: 'POST', input: 'speech dtmf', speechTimeout: 'auto', timeout: 15 });
     g.say({ voice: 'Polly.Danielle-Neural', language: 'en-US' },
       '<speak><prosody rate="85%">I\'m so sorry for the trouble — I want to make sure you get the help you need. ' +
       'I can take a detailed message right now and have our team call you back, ' +
@@ -1298,7 +1299,7 @@ function buildEscalationResponse(twiml, callerPhone, callSid, reason) {
     twiml.redirect('/take-message-content');
   } else {
     // Collect name and callback number first
-    const g = twiml.gather({ action: '/escalation-collect-name', method: 'POST', input: 'speech', speechTimeout: '4', timeout: 15 });
+    const g = twiml.gather({ action: '/escalation-collect-name', method: 'POST', input: 'speech', speechTimeout: 'auto', timeout: 15 });
     g.say({ voice: 'Polly.Danielle-Neural', language: 'en-US' },
       '<speak><prosody rate="85%">I\'m so sorry for the trouble. I want to make sure our team can follow up with you. Could you please tell me your first and last name?</prosody></speak>'
     );
@@ -1316,7 +1317,7 @@ app.post('/escalation-collect-name', (req, res) => {
     sess._escalationName = speech;
   }
   // Now collect callback phone number
-  const g = twiml.gather({ action: '/escalation-collect-phone', method: 'POST', input: 'speech dtmf', speechTimeout: '4', timeout: 15 });
+  const g = twiml.gather({ action: '/escalation-collect-phone', method: 'POST', input: 'speech dtmf', speechTimeout: 'auto', timeout: 15 });
   g.say({ voice: 'Polly.Danielle-Neural', language: 'en-US' },
     `<speak><prosody rate="85%">Thank you${speech ? ', ' + speech.split(' ')[0] : ''}. What is the best phone number for our team to reach you?</prosody></speak>`
   );
@@ -1333,7 +1334,7 @@ app.post('/escalation-collect-phone', (req, res) => {
     sess._escalationPhone = speech;
   }
   // Collect email
-  const g = twiml.gather({ action: '/escalation-collect-email', method: 'POST', input: 'speech', speechTimeout: '4', timeout: 15 });
+  const g = twiml.gather({ action: '/escalation-collect-email', method: 'POST', input: 'speech', speechTimeout: 'auto', timeout: 15 });
   g.say({ voice: 'Polly.Danielle-Neural', language: 'en-US' },
     '<speak><prosody rate="85%">And what is the best email address for you?</prosody></speak>'
   );
@@ -1359,7 +1360,7 @@ app.post('/escalation-collect-email', (req, res) => {
   escalateToStaff(callerPhone, `⚠️ Follow-up needed — ${sess._escalationReason || 'caller needs help'}`, contactSummary).catch(() => {});
   sendCallSummaryToStaff(callerPhone, `Escalated. ${contactSummary}`).catch(() => {});
   // Now offer message or portal
-  const g = twiml.gather({ action: '/escalation-choice', method: 'POST', input: 'speech dtmf', speechTimeout: '4', timeout: 15 });
+  const g = twiml.gather({ action: '/escalation-choice', method: 'POST', input: 'speech dtmf', speechTimeout: 'auto', timeout: 15 });
   g.say({ voice: 'Polly.Danielle-Neural', language: 'en-US' },
     '<speak><prosody rate="85%">Thank you! Our team will be in touch. Would you also like to leave a detailed message for the team, or would you prefer I send you a link to our patient portal where you can message the doctors directly?</prosody></speak>'
   );
@@ -1384,7 +1385,7 @@ app.post('/escalation-choice', (req, res) => {
     } else {
       say(twiml, `Of course! Please visit Taylor Medical Group dot net and click Patient Portal in the top right corner to message our doctors directly. You can also reach us through the portal for appointments, prescriptions, and lab results.`);
     }
-    const g = twiml.gather({ action: '/main-intent', input: 'speech', speechTimeout: '3', timeout: 8 });
+    const g = twiml.gather({ action: '/main-intent', input: 'speech', speechTimeout: 'auto', timeout: 8 });
     say(g, 'Is there anything else I can help you with today?');
     twiml.hangup();
   } else {
@@ -1477,7 +1478,7 @@ app.post('/voice', (req, res) => {
 
   // Universal intake gate — collect name before anything else
   const greeting = "Hi there! Thank you so much for calling Taylor Medical Group — this is Taylor, and I am so glad you called! May I start by getting your first and last name?";
-  const g = gather(twiml, '/intake-firstname', { input: 'speech', speechTimeout: '3', timeout: 15 });
+  const g = gather(twiml, '/intake-firstname', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
   say(g, greeting, callSid, '/voice');
   twiml.redirect('/voice');
   res.type('text/xml').send(twiml.toString());
@@ -1509,7 +1510,7 @@ app.post('/intake-firstname', (req, res) => {
       };
       const ack = LANG_ACKS[sess.lang];
       if (ack) {
-        const g = gather(twiml, '/intake-firstname', { input: 'speech', speechTimeout: '3', timeout: 15 });
+        const g = gather(twiml, '/intake-firstname', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
         sayLang(g, ack, sess.lang, callSid, '/intake-firstname');
         return res.type('text/xml').send(twiml.toString());
       }
@@ -1531,7 +1532,7 @@ app.post('/intake-firstname', (req, res) => {
       twiml.redirect('/main-intent');
       return res.type('text/xml').send(twiml.toString());
     }
-    const g = gather(twiml, '/intake-firstname', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/intake-firstname', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     sayLang(g, "I'd love to help! Could you please tell me your first and last name?", lang, callSid, '/intake-firstname');
     return res.type('text/xml').send(twiml.toString());
   }
@@ -1554,7 +1555,7 @@ app.post('/intake-firstname', (req, res) => {
     sess.pronouncedName = firstName;
     // Confirm the full name directly — skip spelling loop
     const fullName = `${firstName} ${lastName}`;
-    const g = gather(twiml, '/intake-confirm-fullname', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/intake-confirm-fullname', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     sayLang(g, `Nice to meet you! I have your name as ${fullName} — is that correct?`, lang, callSid, '/intake-firstname');
     return res.type('text/xml').send(twiml.toString());
   }
@@ -1562,12 +1563,12 @@ app.post('/intake-firstname', (req, res) => {
   if (realWords.length === 1) {
     const firstName = realWords[0].charAt(0).toUpperCase() + realWords[0].slice(1).toLowerCase();
     sess._pendingFirstName = firstName;
-    const g = gather(twiml, '/intake-spell-lastname', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/intake-spell-lastname', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     sayLang(g, `Thank you! And could you spell your last name for me, one letter at a time?`, lang, callSid, '/intake-firstname');
     return res.type('text/xml').send(twiml.toString());
   }
   // Fallback — couldn't parse, ask again
-  const g = gather(twiml, '/intake-firstname', { input: 'speech', speechTimeout: '3', timeout: 15 });
+  const g = gather(twiml, '/intake-firstname', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
   sayLang(g, "I'd love to help! Could you please tell me your first and last name?", lang, callSid, '/intake-firstname');
   res.type('text/xml').send(twiml.toString());
 });
@@ -1578,7 +1579,7 @@ app.post('/intake-spell-name', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech || speech.length < 2) {
-    const g = gather(twiml, '/intake-spell-name', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/intake-spell-name', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, pick(RETRY_PROMPTS) + " Could you spell your first name for me, one letter at a time?");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -1615,7 +1616,7 @@ app.post('/intake-spell-name', (req, res) => {
         sess._pendingFirstName = firstName;
         sess._pendingLastName = lastName;
         sess.pronouncedName = firstName;
-        const g = gather(twiml, '/intake-confirm-fullname', { input: 'speech', speechTimeout: '3', timeout: 12 });
+        const g = gather(twiml, '/intake-confirm-fullname', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
         say(g, `I have your name as ${firstName} ${lastName} — is that correct?`);
         return res.type('text/xml').send(twiml.toString());
       }
@@ -1640,7 +1641,7 @@ app.post('/intake-spell-name', (req, res) => {
         sess._pendingFirstName = firstName;
         sess._pendingLastName = lastName;
         sess.pronouncedName = firstName;
-        const g2 = gather(twiml, '/intake-confirm-fullname', { input: 'speech', speechTimeout: '3', timeout: 12 });
+        const g2 = gather(twiml, '/intake-confirm-fullname', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
         say(g2, `I have your name as ${firstName} ${lastName} — is that correct?`);
         return res.type('text/xml').send(twiml.toString());
       }
@@ -1648,7 +1649,7 @@ app.post('/intake-spell-name', (req, res) => {
     // Final fallback — treat entire spelled sequence as first name only
     firstName = joined.charAt(0).toUpperCase() + joined.slice(1).toLowerCase();
     sess._pendingFirstName = firstName;
-    const g = gather(twiml, '/intake-confirm-firstname', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/intake-confirm-firstname', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, `I have your first name as ${firstName} — is that correct?`);
     return res.type('text/xml').send(twiml.toString());
   }
@@ -1656,7 +1657,7 @@ app.post('/intake-spell-name', (req, res) => {
   const parsedFirst = normalizeName(speech);
   const cleanFirst = parsedFirst.includes(' ') ? parsedFirst.split(' ')[0] : parsedFirst;
   sess._pendingFirstName = cleanFirst;
-  const g = gather(twiml, '/intake-confirm-firstname', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/intake-confirm-firstname', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `I have your first name as ${cleanFirst} — is that correct?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -1676,7 +1677,7 @@ app.post('/intake-confirm-firstname', (req, res) => {
       const parsedFirst = normalizeName(correctionInline[2].trim());
       const cleanFirst = parsedFirst.includes(' ') ? parsedFirst.split(' ')[0] : parsedFirst;
       sess._pendingFirstName = cleanFirst;
-      const g = gather(twiml, '/intake-confirm-firstname', { input: 'speech', speechTimeout: '3', timeout: 12 });
+      const g = gather(twiml, '/intake-confirm-firstname', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
       say(g, `Got it! I have your first name as ${cleanFirst} — is that correct?`);
       return res.type('text/xml').send(twiml.toString());
     }
@@ -1685,13 +1686,13 @@ app.post('/intake-confirm-firstname', (req, res) => {
       buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm first name after multiple attempts');
       return res.type('text/xml').send(twiml.toString());
     }
-    const g = gather(twiml, '/intake-spell-name', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/intake-spell-name', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, 'No problem! Go ahead and spell your first name for me, one letter at a time.');
     return res.type('text/xml').send(twiml.toString());
   }
   sess.firstName = sess._pendingFirstName;
   delete sess._pendingFirstName;
-  const g = gather(twiml, '/intake-spell-lastname', { input: 'speech', speechTimeout: '3', timeout: 15 });
+  const g = gather(twiml, '/intake-spell-lastname', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
   say(g, `${pick(AFFIRMATIONS)} And could you spell your last name for me, one letter at a time?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -1702,13 +1703,13 @@ app.post('/intake-spell-lastname', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/intake-spell-lastname', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/intake-spell-lastname', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, pick(RETRY_PROMPTS) + " Could you spell your last name for me?");
     return res.type('text/xml').send(twiml.toString());
   }
   const parsedLast = normalizeName(speech);
   sess._pendingLastName = parsedLast;
-  const g = gather(twiml, '/intake-confirm-lastname', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/intake-confirm-lastname', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `I have your last name as ${parsedLast} — is that correct?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -1726,7 +1727,7 @@ app.post('/intake-confirm-lastname', (req, res) => {
     if (correctionInline && correctionInline[2] && correctionInline[2].trim().length > 1) {
       const parsedLast = normalizeName(correctionInline[2].trim());
       sess._pendingLastName = parsedLast;
-      const g = gather(twiml, '/intake-confirm-lastname', { input: 'speech', speechTimeout: '3', timeout: 12 });
+      const g = gather(twiml, '/intake-confirm-lastname', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
       say(g, `Got it! I have your last name as ${parsedLast} — is that correct?`);
       return res.type('text/xml').send(twiml.toString());
     }
@@ -1735,7 +1736,7 @@ app.post('/intake-confirm-lastname', (req, res) => {
       buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm last name after multiple attempts');
       return res.type('text/xml').send(twiml.toString());
     }
-    const g = gather(twiml, '/intake-spell-lastname', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/intake-spell-lastname', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, 'No problem! Go ahead and spell your last name for me, one letter at a time.');
     return res.type('text/xml').send(twiml.toString());
   }
@@ -1743,7 +1744,7 @@ app.post('/intake-confirm-lastname', (req, res) => {
   delete sess._pendingLastName;
   // Read back full name for final confirmation
   const fullName = `${sess.firstName || ''} ${sess.lastName}`.trim();
-  const g = gather(twiml, '/intake-confirm-fullname', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/intake-confirm-fullname', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `${pick(AFFIRMATIONS)} So your full name is ${fullName} — is that right?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -1760,13 +1761,13 @@ app.post('/intake-confirm-fullname', (req, res) => {
       buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm full name after multiple attempts');
       return res.type('text/xml').send(twiml.toString());
     }
-    const g = gather(twiml, '/intake-spell-name', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/intake-spell-name', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, 'No problem! Let me get your name again — please spell your first name, one letter at a time.');
     return res.type('text/xml').send(twiml.toString());
   }
   // Skip pronunciation step — use confirmed spelled first name directly to avoid mishearing bugs
   sess.pronouncedName = toPronouncedName(sess.firstName);
-  const g = gather(twiml, '/intake-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/intake-phone', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `${pick(AFFIRMATIONS)} And what's the best phone number to reach you at?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -1777,7 +1778,7 @@ app.post('/intake-pronounce', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   sess.pronouncedName = toPronouncedName(sess.firstName);
-  const g = gather(twiml, '/intake-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/intake-phone', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `And what's the best phone number to reach you at?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -1788,12 +1789,12 @@ app.post('/intake-lastname-only', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/intake-lastname-only', { input: 'speech', speechTimeout: '3', timeout: 10 });
+    const g = gather(twiml, '/intake-lastname-only', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
     say(g, "I didn't catch that. What is your last name?");
     return res.type('text/xml').send(twiml.toString());
   }
   sess.lastName = normalizeName(speech);
-  const g = gather(twiml, '/intake-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/intake-phone', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `Perfect, thank you! And what's the best phone number to reach you at?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -1808,7 +1809,7 @@ app.post('/intake-phone', (req, res) => {
   const sess = getSession(callSid);
 
   if (!speech || speech.length < 3) {
-    const g = gather(twiml, '/intake-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/intake-phone', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "I'm sorry, I didn't catch that! What's the best number to reach you at?");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -1825,7 +1826,7 @@ app.post('/intake-phone', (req, res) => {
 
   // Read back the number for confirmation before moving on
   const phoneReadback = (sess._pendingPhone || '').replace(/\+1/, '').replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
-  const g = gather(twiml, '/intake-confirm-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/intake-confirm-phone', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `I have your number as ${phoneReadback} — is that correct?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -1843,7 +1844,7 @@ app.post('/intake-confirm-phone', (req, res) => {
       const digits = correctionInline[2].replace(/\D/g, '').slice(-10);
       sess._pendingPhone = digits.length >= 10 ? `+1${digits}` : sess.callerPhone;
       const phoneReadback = sess._pendingPhone.replace(/\+1/, '').replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
-      const g = gather(twiml, '/intake-confirm-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+      const g = gather(twiml, '/intake-confirm-phone', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
       say(g, `Got it! I have your number as ${phoneReadback} — is that correct?`);
       return res.type('text/xml').send(twiml.toString());
     }
@@ -1852,14 +1853,14 @@ app.post('/intake-confirm-phone', (req, res) => {
       buildEscalationResponse(twiml, req.body.From || sess.callerPhone || 'anonymous', callSid, 'Could not confirm phone number after multiple attempts');
       return res.type('text/xml').send(twiml.toString());
     }
-    const g = gather(twiml, '/intake-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/intake-phone', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, 'No problem! What is the best number to reach you at?');
     return res.type('text/xml').send(twiml.toString());
   }
   // Confirmed — store and move on
   sess.collectedPhone = sess._pendingPhone;
   delete sess._pendingPhone;
-  const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: '3', timeout: 15 });
+  const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
   say(g, `Perfect, thank you ${sess.pronouncedName || sess.firstName}! How can I help you today?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -1908,11 +1909,11 @@ app.post('/main-intent', (req, res) => {
     const alreadyNew = /new patient|first time|never been|haven.t been|first visit|never seen|brand new|just moved|just found|want to become/.test(speechLower);
     if (alreadyEstablished) {
       sess.patientType = 'established';
-      const g = gather(twiml, '/appt-service-type', { input: 'speech', speechTimeout: '3', timeout: 12 });
+      const g = gather(twiml, '/appt-service-type', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
       say(g, "Welcome back! It's great to hear from you. What type of visit are you scheduling today — a follow-up, annual wellness visit, telehealth, IV therapy, or something else?");
     } else if (alreadyNew) {
       sess.patientType = 'new';
-      const g = gather(twiml, '/lead-collect-name', { input: 'speech', speechTimeout: '3', timeout: 12 });
+      const g = gather(twiml, '/lead-collect-name', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
       say(g, "Wonderful! We'd love to have you. Let me get a little information first. What is your full name?");
     } else {
       const g = gather(twiml, '/appt-patient-type', { timeout: 10 });
@@ -1963,7 +1964,7 @@ app.post('/main-intent', (req, res) => {
       const patientEmail = sess.emailOnFile || sess.patientRecord?.Email || null;
       if (patientEmail) sendPortalLinkToPatient(patientEmail, sess.pronouncedName || sess.firstName || '').catch(() => {});
       sendCallSummaryToStaff(callerPhone, `Reason: Caller asked for email — redirected to portal`).catch(() => {});
-      const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: '3', timeout: 10 });
+      const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
       say(g, 'Is there anything else I can help you with today?');
       twiml.hangup();
     }
@@ -1974,7 +1975,7 @@ app.post('/main-intent', (req, res) => {
       const callerName = sess.firstName ? `${sess.firstName} ${sess.lastName || ''}`.trim() : 'Caller';
       escalateToStaff(callerPhone, `💬 Message from ${callerName}`, `Caller: ${callerName}\nPhone: ${callerPhone}\nMessage: ${speech}`).catch(() => {});
       say(twiml, "I've sent your message to our team and they'll follow up with you shortly. Is there anything else I can help you with today?");
-      const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: '3', timeout: 10 });
+      const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
       say(g, "");
       twiml.hangup();
     } else {
@@ -2278,7 +2279,7 @@ app.post('/refill-start', (req, res) => {
     sess.refillDob = sess.dob;
     twiml.redirect('/refill-collect-pharmacy-name');
   } else {
-    const g = gather(twiml, '/refill-collect-name', { input: 'speech', speechTimeout: '3', timeout: 10 });
+    const g = gather(twiml, '/refill-collect-name', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
     say(g, "I'd be happy to help with your prescription refill! To pull up your chart, could you please tell me your first and last name?");
   }
   res.type('text/xml').send(twiml.toString());
@@ -2290,7 +2291,7 @@ app.post('/refill-collect-name', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/refill-collect-name', { input: 'speech', speechTimeout: '3', timeout: 10 });
+    const g = gather(twiml, '/refill-collect-name', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
     say(g, "I didn't catch that. Could you please say your first and last name?");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -2298,7 +2299,7 @@ app.post('/refill-collect-name', (req, res) => {
   const parts = normalizedFull.split(/\s+/);
   sess.refillFirstName = parts[0] || '';
   sess.refillLastName = parts.slice(1).join(' ') || '';
-  const g = gather(twiml, '/refill-collect-dob', { input: 'speech', speechTimeout: '3', timeout: 10 });
+  const g = gather(twiml, '/refill-collect-dob', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
   say(g, `Thank you! And could you please tell me your date of birth?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -2328,7 +2329,7 @@ async function storePharmacyForClient(clientId, pharmacyBlock, existingInfo) {
 app.post('/refill-collect-pharmacy-name', (req, res) => {
   const callSid = req.body.CallSid;
   const twiml = new VoiceResponse();
-  const g = gather(twiml, '/refill-got-pharmacy-name', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/refill-got-pharmacy-name', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, "Before we continue, I need to confirm your pharmacy information. What is the name of your pharmacy?");
   res.type('text/xml').send(twiml.toString());
 });
@@ -2339,12 +2340,12 @@ app.post('/refill-got-pharmacy-name', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/refill-got-pharmacy-name', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/refill-got-pharmacy-name', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "I didn't catch that. What is the name of your pharmacy?");
     return res.type('text/xml').send(twiml.toString());
   }
   sess.newPharmacyName = speech;
-  const g = gather(twiml, '/refill-got-pharmacy-address', { input: 'speech', speechTimeout: '4', timeout: 15 });
+  const g = gather(twiml, '/refill-got-pharmacy-address', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
   say(g, "What is the full address of your pharmacy, including street address, city, state, and zip code?");
   res.type('text/xml').send(twiml.toString());
 });
@@ -2355,12 +2356,12 @@ app.post('/refill-got-pharmacy-address', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/refill-got-pharmacy-address', { input: 'speech', speechTimeout: '4', timeout: 15 });
+    const g = gather(twiml, '/refill-got-pharmacy-address', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, "I didn't catch that. Please provide the full address including street, city, state, and zip code.");
     return res.type('text/xml').send(twiml.toString());
   }
   sess.newPharmacyAddress = speech;
-  const g = gather(twiml, '/refill-got-pharmacy-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/refill-got-pharmacy-phone', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, "What is the pharmacy's phone number?");
   res.type('text/xml').send(twiml.toString());
 });
@@ -2371,7 +2372,7 @@ app.post('/refill-got-pharmacy-phone', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   sess.newPharmacyPhone = speech || 'not provided';
-  const g = gather(twiml, '/refill-got-pharmacy-fax', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/refill-got-pharmacy-fax', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, "And what is the pharmacy's fax number?");
   res.type('text/xml').send(twiml.toString());
 });
@@ -2411,7 +2412,7 @@ app.post('/refill-check-pin', async (req, res) => {
       if (patientEmail) sendPortalLinkToPatient(patientEmail, `${sess.refillFirstName || ''} ${sess.refillLastName || ''}`.trim()).catch(() => {});
       sendCallSummaryToStaff(sess.callerPhone, `Reason: Refill — patient not found\nName: ${sess.refillFirstName} ${sess.refillLastName} | DOB: ${sess.refillDob}`).catch(() => {});
       say(twiml, "I wasn't able to find your record with that information. I've sent the patient portal link to your email on file. Please visit Taylor Medical Group dot net and click Patient Portal in the top right corner — you can message our team directly there and they will assist you.");
-      const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: '3', timeout: 10 });
+      const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
       say(g, 'Is there anything else I can help you with today?');
       twiml.hangup();
       return res.type('text/xml').send(twiml.toString());
@@ -2431,7 +2432,7 @@ app.post('/refill-check-pin', async (req, res) => {
       if (refillEmail) sendPortalLinkToPatient(refillEmail, sess.refillClientName || '').catch(() => {});
       sendCallSummaryToStaff(sess.callerPhone, `Reason: Refill — PIN mismatch\nPatient: ${sess.refillClientName}`).catch(() => {});
       say(twiml, "I'm sorry, that PIN doesn't match what we have on file. For your security, I've sent the patient portal link to your email on file. Please visit Taylor Medical Group dot net and click Patient Portal in the top right corner to message our team directly.");
-      const gRefillMismatch = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: '3', timeout: 10 });
+      const gRefillMismatch = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
       say(gRefillMismatch, 'Is there anything else I can help you with today?');
       twiml.hangup();
     } else {
@@ -2442,7 +2443,7 @@ app.post('/refill-check-pin', async (req, res) => {
       say(twiml, `I've created a security PIN for you and I'm sending it to you by both text and email right now. Please save it — you'll use it for all future calls to verify your identity. Once you receive it, please tell me the PIN to continue.`);
       const smsTarget = sess.callerPhone;
       await sendSms(smsTarget, `TMG Phone Receptionist — Taylor Medical Group\n\nYour Security PIN: ${newPin}\n\nSave this for future calls to verify your identity.\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n🗺️ Get Directions:\n${CONFIG.practice.mapsLink}\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nBook an appointment: ${CONFIG.intakeq.bookingUrl}`);
-      const g = gather(twiml, '/refill-pin-verify', { input: 'speech dtmf', speechTimeout: '3', timeout: 30 });
+      const g = gather(twiml, '/refill-pin-verify', { input: 'speech dtmf', speechTimeout: 'auto', timeout: 30 });
       say(g, "Go ahead and say or enter your PIN whenever you're ready.");
     }
   } catch (err) {
@@ -2450,7 +2451,7 @@ app.post('/refill-check-pin', async (req, res) => {
     const refillErrEmail = sess.patientRecord?.Email || null;
     if (refillErrEmail) sendPortalLinkToPatient(refillErrEmail, `${sess.refillFirstName || ''} ${sess.refillLastName || ''}`.trim()).catch(() => {});
     say(twiml, "I'm having a little trouble right now. I've sent the patient portal link to your email on file. Please visit Taylor Medical Group dot net and click Patient Portal in the top right corner to submit your prescription refill request directly.");
-    const gRefillErr = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: '3', timeout: 10 });
+    const gRefillErr = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
     say(gRefillErr, 'Is there anything else I can help you with today?');
     twiml.hangup();
   }
@@ -2471,7 +2472,7 @@ app.post('/refill-pin-verify', (req, res) => {
     const refillEmail = sess.refillClientEmail || sess.patientRecord?.Email || null;
     if (refillEmail) sendPortalLinkToPatient(refillEmail, sess.refillClientName || '').catch(() => {});
     say(twiml, "No problem at all! I've just sent the patient portal link to your phone and email right now — please check your inbox and look for an email from us. You can also visit Taylor Medical Group dot net directly and click Patient Portal in the top right corner. Once you're in the portal, you can message our team directly for help with your prescription. Please note that we do not accept emails from patients — all requests must go through the patient portal.");
-    const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: '3', timeout: 10 });
+    const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
     say(g, 'Is there anything else I can help you with today?');
     twiml.hangup();
     return res.type('text/xml').send(twiml.toString());
@@ -2486,11 +2487,11 @@ app.post('/refill-pin-verify', (req, res) => {
       const refillEmail = sess.refillClientEmail || sess.patientRecord?.Email || null;
       if (refillEmail) sendPortalLinkToPatient(refillEmail, sess.refillClientName || '').catch(() => {});
       say(twiml, "I'm sorry, that PIN doesn't match. I've sent the patient portal link to your email on file. Please visit Taylor Medical Group dot net and click Patient Portal in the top right corner to message our team for help with your prescription.");
-      const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: '3', timeout: 10 });
+      const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
       say(g, 'Is there anything else I can help you with today?');
       twiml.hangup();
     } else {
-      const g = gather(twiml, '/refill-pin-verify', { input: 'speech dtmf', speechTimeout: '3', timeout: 20 });
+      const g = gather(twiml, '/refill-pin-verify', { input: 'speech dtmf', speechTimeout: 'auto', timeout: 20 });
       say(g, "That PIN doesn't match. Please check your email and try again, or let me know if you didn't receive it.");
     }
   }
@@ -2521,7 +2522,7 @@ app.post('/refill-verified', async (req, res) => {
     twiml.redirect('/refill-ask-medication');
   } else {
     say(twiml, `Great, I've verified your identity and saved your pharmacy information — welcome back!`);
-    const g = gather(twiml, '/refill-confirm-phone', { input: 'speech', speechTimeout: '3', timeout: 10 });
+    const g = gather(twiml, '/refill-confirm-phone', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
     say(g, `Let me confirm your contact information. The phone number we have on file ends in ${(sess.refillClientPhone || '').slice(-4) || 'unknown'}. Is that still correct? Just say yes or no.`);
   }
   res.type('text/xml').send(twiml.toString());
@@ -2538,10 +2539,10 @@ app.post('/refill-confirm-phone', (req, res) => {
     return res.type('text/xml').send(twiml.toString());
   }
   if (/no|wrong|changed|different|update/.test(speech)) {
-    const g = gather(twiml, '/refill-update-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/refill-update-phone', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "No problem at all! What's your new phone number?");
   } else {
-    const g = gather(twiml, '/refill-confirm-address', { input: 'speech', speechTimeout: '3', timeout: 10 });
+    const g = gather(twiml, '/refill-confirm-address', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
     say(g, "And is your address still the same as what we have on file? Just say yes or no.");
   }
   res.type('text/xml').send(twiml.toString());
@@ -2557,7 +2558,7 @@ app.post('/refill-update-phone', async (req, res) => {
     if (newPhone.length >= 10) await updatePatientContact(sess.refillClientId, { Phone: newPhone }).catch(() => {});
     say(twiml, `Got it — I've updated your phone number. `);
   }
-  const g = gather(twiml, '/refill-confirm-address', { input: 'speech', speechTimeout: '3', timeout: 10 });
+  const g = gather(twiml, '/refill-confirm-address', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
   say(g, "Is your address still the same as what we have on file? Just say yes or no.");
   res.type('text/xml').send(twiml.toString());
 });
@@ -2573,7 +2574,7 @@ app.post('/refill-confirm-address', (req, res) => {
     return res.type('text/xml').send(twiml.toString());
   }
   if (/no|wrong|changed|different|update|moved/.test(speech)) {
-    const g = gather(twiml, '/refill-update-address', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/refill-update-address', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, "Of course! What's your new address? Please include the street, city, and state.");
   } else {
     twiml.redirect('/refill-ask-medication');
@@ -2597,7 +2598,7 @@ app.post('/refill-update-address', async (req, res) => {
 app.post('/refill-ask-medication', (req, res) => {
   const callSid = req.body.CallSid;
   const twiml = new VoiceResponse();
-  const g = gather(twiml, '/refill-process', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/refill-process', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, "What medication would you like to refill?");
   res.type('text/xml').send(twiml.toString());
 });
@@ -2628,7 +2629,7 @@ app.post('/refill-process', async (req, res) => {
       } else {
         say(twiml, `I see it's been a little while since your last visit. Our doctors require either an updated visit or a current hormone test before issuing a full refill — this is to make sure your dosage is still right for you. However, once you schedule an appointment or order a hormone test kit, we'll issue a 30-day bridge refill to cover you in the meantime. Would you like to schedule an appointment, or would you prefer to order a hormone test kit?`);
         sess.refillBridgeNeeded = true;
-        const g = gather(twiml, '/refill-bridge-choice', { input: 'speech', speechTimeout: '3', timeout: 12 });
+        const g = gather(twiml, '/refill-bridge-choice', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
         say(g, "Just say 'appointment' or 'hormone test' — whichever works best for you.");
         return res.type('text/xml').send(twiml.toString());
       }
@@ -2684,15 +2685,15 @@ app.post('/appt-patient-type', (req, res) => {
     const sess = getSession(callSid);
     sess.patientType = 'new'; sess.callerPhone = callerPhone;
     // New patients go to lead capture first
-    const g = gather(twiml, '/lead-collect-name', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/lead-collect-name', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "Wonderful! We'd love to have you. Let me get a little information first. What is your full name?");
   } else if (isEstablished) {
     const sess = getSession(callSid);
     sess.patientType = 'established'; sess.callerPhone = callerPhone;
-    const g = gather(twiml, '/appt-service-type', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-service-type', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "Welcome back! It's great to hear from you. What type of visit are you scheduling today — a follow-up, annual wellness visit, telehealth, IV therapy, or something else?");
   } else {
-    const g = gather(twiml, '/appt-patient-type', { input: 'speech', speechTimeout: '3', timeout: 10 });
+    const g = gather(twiml, '/appt-patient-type', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
     say(g, "Are you a new patient, or an existing patient?");
   }
   res.type('text/xml').send(twiml.toString());
@@ -2707,7 +2708,7 @@ app.post('/lead-start', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   sess._callerType = 'new_patient_lead';
-  const g = gather(twiml, '/lead-collect-name', { input: 'speech', speechTimeout: '3', timeout: 15 });
+  const g = gather(twiml, '/lead-collect-name', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
   say(g, "Wonderful! We would love to have you as a patient. May I start by getting your full name?");
   res.type('text/xml').send(twiml.toString());
 });
@@ -2718,7 +2719,7 @@ app.post('/lead-collect-name', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/lead-collect-name', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/lead-collect-name', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "I didn't catch that. What is your full name?");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -2727,7 +2728,7 @@ app.post('/lead-collect-name', (req, res) => {
   sess._pendingFirstName = leadParts[0] || '';
   sess._pendingLastName = leadParts.slice(1).join(' ') || '';
   const fullNameSpoken = normalizedLeadName.trim();
-  const g = gather(twiml, '/lead-confirm-name', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/lead-confirm-name', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `I have your name as ${fullNameSpoken} — is that correct?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -2744,7 +2745,7 @@ app.post('/lead-confirm-name', (req, res) => {
       buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm name after multiple attempts');
       return res.type('text/xml').send(twiml.toString());
     }
-    const g = gather(twiml, '/lead-collect-name', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/lead-collect-name', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, 'No problem! What is your full name?');
     return res.type('text/xml').send(twiml.toString());
   }
@@ -2752,7 +2753,7 @@ app.post('/lead-confirm-name', (req, res) => {
   sess.lastName = sess._pendingLastName || '';
   delete sess._pendingFirstName;
   delete sess._pendingLastName;
-  const g = gather(twiml, '/lead-collect-email', { input: 'speech', speechTimeout: '3', timeout: 15 });
+  const g = gather(twiml, '/lead-collect-email', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
   say(g, `So nice to meet you, ${sess.firstName}! What's the best email address for you?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -2762,7 +2763,7 @@ app.post('/lead-collect-email', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   // This route is the PROMPT — ask caller to spell their email
-  const g = gather(twiml, '/lead-spell-email', { input: 'speech', speechTimeout: '4', timeout: 20 });
+  const g = gather(twiml, '/lead-spell-email', { input: 'speech', speechTimeout: 'auto', timeout: 20 });
   say(g, `Great! Now I need your email address. Please spell it out for me — say each letter one at a time, and say "at" for the at sign and "dot" for the period. Go ahead whenever you're ready.`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -2773,13 +2774,13 @@ app.post('/lead-spell-email', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/lead-spell-email', { input: 'speech', speechTimeout: '4', timeout: 20 });
+    const g = gather(twiml, '/lead-spell-email', { input: 'speech', speechTimeout: 'auto', timeout: 20 });
     say(g, "I didn't catch that. Please spell your email address — say each letter one at a time, and say at for the at sign and dot for the period.");
     return res.type('text/xml').send(twiml.toString());
   }
   const parsed = parseSpelledEmail(speech);
   sess._pendingEmail = parsed;
-  const g = gather(twiml, '/lead-confirm-email', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/lead-confirm-email', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `I have your email as ${spellOutEmail(parsed)} — is that correct?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -2797,13 +2798,13 @@ app.post('/lead-confirm-email', (req, res) => {
       buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm email address after multiple attempts');
       return res.type('text/xml').send(twiml.toString());
     }
-    const g = gather(twiml, '/lead-spell-email', { input: 'speech', speechTimeout: '4', timeout: 20 });
+    const g = gather(twiml, '/lead-spell-email', { input: 'speech', speechTimeout: 'auto', timeout: 20 });
     say(g, "No problem! Let's try again — please spell your email address one letter at a time, saying at for the at sign and dot for the period.");
     return res.type('text/xml').send(twiml.toString());
   }
   sess.email = sess._pendingEmail;
   delete sess._pendingEmail;
-  const g = gather(twiml, '/lead-collect-callback', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/lead-collect-callback', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `${pick(AFFIRMATIONS)} And what is the best callback number for you?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -2814,7 +2815,7 @@ app.post('/lead-collect-callback', async (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/lead-collect-callback', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/lead-collect-callback', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "I didn't catch that. What is your callback number?");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -2830,7 +2831,7 @@ app.post('/lead-collect-callback', async (req, res) => {
   // Notify staff of new lead
   escalateToStaff(sess.callerPhone, '🆕 New Patient Lead Captured', `Name: ${sess.firstName} ${sess.lastName || ''}\nEmail: ${sess.email || 'not given'}\nCallback: ${sess.collectedPhone}\nCaller ID: ${sess.callerPhone}`).catch(() => {});
   // Ask if they want service info or book now
-  const g = gather(twiml, '/lead-next-step', { input: 'speech', speechTimeout: '3', timeout: 14 });
+  const g = gather(twiml, '/lead-next-step', { input: 'speech', speechTimeout: 'auto', timeout: 14 });
   say(g, `Wonderful, ${sess.pronouncedName || sess.firstName}! You are all set — we are so excited to have you! Now, would you like to hear about our services, or are you ready to go ahead and schedule your appointment today?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -2845,11 +2846,11 @@ app.post('/lead-next-step', (req, res) => {
   const wantsBook = /book|schedule|yes|now|today|appointment|go ahead|let.s do|sure|ready|schedule now/.test(speech);
 
   if (wantsBook) {
-    const g = gather(twiml, '/appt-service-type', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-service-type', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "Wonderful! What brings you in — are you interested in hormone therapy, weight loss, IV therapy, telehealth, or something else?");
   } else {
     // Default to services info if unclear or they ask about services
-    const g = gather(twiml, '/lead-service-interest', { input: 'speech', speechTimeout: '3', timeout: 14 });
+    const g = gather(twiml, '/lead-service-interest', { input: 'speech', speechTimeout: 'auto', timeout: 14 });
     say(g, "Of course! We specialize in hormone therapy and balance, weight loss and metabolic health, IV therapy, functional medicine, cosmetic treatments, and telehealth. Which of those areas would you like to know more about?");
   }
   res.type('text/xml').send(twiml.toString());
@@ -2879,7 +2880,7 @@ app.post('/lead-service-interest', (req, res) => {
   sendCallSummaryToStaff(sess.callerPhone, `New Patient Lead — Service Interest\nName: ${sess.firstName} ${sess.lastName || ''}\nInterest: ${speech}\nEmail: ${sess.email || 'not given'}\nCallback: ${sess.collectedPhone || sess.callerPhone}`).catch(() => {});
 
   say(twiml, `${info}`);
-  const g = gather(twiml, '/lead-next-step', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/lead-next-step', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, "Would you like to schedule a consultation today, or is there anything else I can help you with?");
   res.type('text/xml').send(twiml.toString());
 });
@@ -2926,15 +2927,15 @@ app.post('/appt-service-type', (req, res) => {
     sess.practitionerName = CONFIG.intakeq.practitioners.ava.name;
     say(twiml, `Perfect! I'll get you scheduled for ${selected.name} with ${CONFIG.intakeq.practitioners.ava.name}. We don't accept insurance, but we do accept HSA and FSA cards.`);
     if (sess.firstName && sess.lastName) {
-      const g = gather(twiml, '/appt-collect-dob', { input: 'speech', speechTimeout: '3', timeout: 12 });
+      const g = gather(twiml, '/appt-collect-dob', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
       say(g, `For verification, ${sess.firstName}, what is your date of birth?`);
     } else {
-      const g = gather(twiml, '/appt-collect-name', { input: 'speech', speechTimeout: '3', timeout: 10 });
+      const g = gather(twiml, '/appt-collect-name', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
       say(g, 'Could you please tell me your first name?');
     }
   } else {
     say(twiml, `Perfect! I'll get you scheduled for ${selected.name}. We don't accept insurance, but we do accept HSA and FSA cards.`);
-    const g = gather(twiml, '/appt-select-doctor', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-select-doctor', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, 'Would you like to schedule with Dr. Eldred Taylor or Dr. Ava Bell-Taylor?');
   }
   res.type('text/xml').send(twiml.toString());
@@ -2946,7 +2947,7 @@ app.post('/appt-service-type-established', (req, res) => {
   const sess = getSession(callSid);
   sess.serviceId = CONFIG.services.establishedFollowUp30;
   sess.serviceName = 'a Follow-up visit';
-  const g = gather(twiml, '/appt-select-doctor', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/appt-select-doctor', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, 'Would you like to schedule with Dr. Eldred Taylor or Dr. Ava Bell-Taylor?');
   res.type('text/xml').send(twiml.toString());
 });
@@ -2959,7 +2960,7 @@ app.post('/appt-select-doctor', (req, res) => {
   const sess = getSession(callSid);
 
   if (!speech) {
-    const g = gather(twiml, '/appt-select-doctor', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-select-doctor', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, pick(RETRY_PROMPTS) + ' Would you like to schedule with Dr. Eldred Taylor or Dr. Ava Bell-Taylor?');
     return res.type('text/xml').send(twiml.toString());
   }
@@ -2999,7 +3000,7 @@ app.post('/appt-select-doctor', (req, res) => {
     practitioner = CONFIG.intakeq.practitioners.ava;
   } else {
     // Can't determine — ask again
-    const g = gather(twiml, '/appt-select-doctor', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-select-doctor', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "I just want to make sure I have that right — would you like to see Dr. Eldred Taylor or Dr. Ava Bell-Taylor?");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -3010,10 +3011,10 @@ app.post('/appt-select-doctor', (req, res) => {
 
   // Proceed to name collection or DOB if name already known
   if (sess.firstName && sess.lastName) {
-    const g = gather(twiml, '/appt-collect-dob', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-collect-dob', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, `For verification, ${sess.pronouncedName || sess.firstName}, what is your date of birth?`);
   } else {
-    const g = gather(twiml, '/appt-collect-name', { input: 'speech', speechTimeout: '3', timeout: 10 });
+    const g = gather(twiml, '/appt-collect-name', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
     say(g, 'Could you please tell me your first and last name?');
   }
   res.type('text/xml').send(twiml.toString());
@@ -3025,7 +3026,7 @@ app.post('/appt-collect-name', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech || speech.length < 2) {
-    const g = gather(twiml, '/appt-collect-name', { input: 'speech', speechTimeout: '3', timeout: 10 });
+    const g = gather(twiml, '/appt-collect-name', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
     say(g, pick(RETRY_PROMPTS) + ' Could you please tell me your first and last name?');
     return res.type('text/xml').send(twiml.toString());
   }
@@ -3046,7 +3047,7 @@ app.post('/appt-collect-name', (req, res) => {
   }
 
   sess.spokenName = speech;
-  const g = gather(twiml, '/appt-spell-name', { input: 'speech', speechTimeout: '3', timeout: 15 });
+  const g = gather(twiml, '/appt-spell-name', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
   say(g, pick(AFFIRMATIONS) + ' To make sure I have your name exactly right, could you please spell your first name for me, one letter at a time?');
   res.type('text/xml').send(twiml.toString());
 });
@@ -3057,14 +3058,14 @@ app.post('/appt-spell-name', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/appt-spell-name', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/appt-spell-name', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, pick(RETRY_PROMPTS) + ' Could you please spell your first name, one letter at a time?');
     return res.type('text/xml').send(twiml.toString());
   }
   // Escape hatch
   const esc = checkEscape(speech, sess, { noPivot: true });
   if (esc.action === 'correct') {
-    const g = gather(twiml, '/appt-collect-name', { input: 'speech', speechTimeout: '3', timeout: 10 });
+    const g = gather(twiml, '/appt-collect-name', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
     say(g, "No problem! Let's start over — what is your first and last name?");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -3085,7 +3086,7 @@ app.post('/appt-spell-name', (req, res) => {
   const parsedFirst = normalizeName(speech);
   const cleanFirst = parsedFirst.includes(' ') ? parsedFirst.split(' ')[0] : parsedFirst;
   sess._pendingFirstName = cleanFirst;
-  const g = gather(twiml, '/appt-confirm-firstname', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/appt-confirm-firstname', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `I have your first name as ${cleanFirst} — is that correct?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -3102,13 +3103,13 @@ app.post('/appt-confirm-firstname', (req, res) => {
       buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm first name after multiple attempts');
       return res.type('text/xml').send(twiml.toString());
     }
-    const g = gather(twiml, '/appt-spell-name', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/appt-spell-name', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, "No problem! Let me get your first name again — could you spell it for me, one letter at a time?");
     return res.type('text/xml').send(twiml.toString());
   }
   sess.firstName = sess._pendingFirstName;
   delete sess._pendingFirstName;
-  const g = gather(twiml, '/appt-spell-lastname', { input: 'speech', speechTimeout: '3', timeout: 15 });
+  const g = gather(twiml, '/appt-spell-lastname', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
   say(g, pick(AFFIRMATIONS) + ' Now could you please spell your last name for me, one letter at a time?');
   res.type('text/xml').send(twiml.toString());
 });
@@ -3120,14 +3121,14 @@ app.post('/appt-spell-lastname', (req, res) => {
   const sess = getSession(callSid);
   // Only loop back if truly empty — a single letter is valid (e.g. last name "Li")
   if (!speech) {
-    const g = gather(twiml, '/appt-spell-lastname', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/appt-spell-lastname', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, pick(RETRY_PROMPTS) + ' Could you please spell your last name, one letter at a time?');
     return res.type('text/xml').send(twiml.toString());
   }
   // Escape hatch
   const esc = checkEscape(speech, sess, { noPivot: true });
   if (esc.action === 'correct') {
-    const g = gather(twiml, '/appt-spell-name', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/appt-spell-name', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, "No problem! Let me get your first name again — could you spell it for me, one letter at a time?");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -3147,7 +3148,7 @@ app.post('/appt-spell-lastname', (req, res) => {
 
   const parsedLast = normalizeName(speech);
   sess._pendingLastName = parsedLast;
-  const g = gather(twiml, '/appt-confirm-lastname', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/appt-confirm-lastname', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `I have your last name as ${parsedLast} — is that correct?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -3164,7 +3165,7 @@ app.post('/appt-confirm-lastname', (req, res) => {
       buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm last name after multiple attempts');
       return res.type('text/xml').send(twiml.toString());
     }
-    const g = gather(twiml, '/appt-spell-lastname', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/appt-spell-lastname', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, "No problem! Let me get your last name again — could you spell it for me, one letter at a time?");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -3172,7 +3173,7 @@ app.post('/appt-confirm-lastname', (req, res) => {
   delete sess._pendingLastName;
   // Now confirm full name before moving on
   const fullName = `${sess.firstName || ''} ${sess.lastName}`.trim();
-  const g = gather(twiml, '/appt-confirm-fullname', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/appt-confirm-fullname', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `${pick(AFFIRMATIONS)} So your full name is ${fullName} — is that right?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -3190,13 +3191,13 @@ app.post('/appt-confirm-fullname', (req, res) => {
       buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm full name after multiple attempts');
       return res.type('text/xml').send(twiml.toString());
     }
-    const g = gather(twiml, '/appt-fix-name-part', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-fix-name-part', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "No problem! Which part would you like to fix — your first name or your last name?");
     return res.type('text/xml').send(twiml.toString());
   }
   // Skip pronunciation step — use confirmed spelled first name directly
   sess.pronouncedName = toPronouncedName(sess.firstName);
-  const g = gather(twiml, '/appt-collect-dob', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/appt-collect-dob', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `${pick(AFFIRMATIONS)} For verification, ${sess.firstName}, what is your date of birth?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -3207,14 +3208,14 @@ app.post('/appt-fix-name-part', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (/first/.test(speech)) {
-    const g = gather(twiml, '/appt-spell-name', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/appt-spell-name', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, "Of course! Let me get your first name again — please spell it one letter at a time.");
   } else if (/last/.test(speech)) {
-    const g = gather(twiml, '/appt-spell-lastname', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/appt-spell-lastname', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, "No problem! Let me get your last name again — please spell it one letter at a time.");
   } else {
     // Unclear — restart both
-    const g = gather(twiml, '/appt-spell-name', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/appt-spell-name', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, "Let me get your full name again — please spell your first name, one letter at a time.");
   }
   res.type('text/xml').send(twiml.toString());
@@ -3226,7 +3227,7 @@ app.post('/appt-pronounce', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   sess.pronouncedName = toPronouncedName(sess.firstName);
-  const g = gather(twiml, '/appt-collect-dob', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/appt-collect-dob', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `For verification, ${sess.firstName}, what is your date of birth?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -3238,12 +3239,12 @@ app.post('/appt-collect-lastname', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/appt-collect-lastname', { input: 'speech', speechTimeout: '3', timeout: 10 });
+    const g = gather(twiml, '/appt-collect-lastname', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
     say(g, "Could you please say your last name?");
     return res.type('text/xml').send(twiml.toString());
   }
   sess.lastName = normalizeName(speech);
-  const g = gather(twiml, '/appt-collect-dob', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/appt-collect-dob', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `Thank you, ${sess.pronouncedName || sess.firstName} ${sess.lastName}. For verification, what is your date of birth?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -3254,14 +3255,14 @@ app.post('/appt-collect-dob', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/appt-collect-dob', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-collect-dob', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, pick(RETRY_PROMPTS) + ' What is your date of birth?');
     return res.type('text/xml').send(twiml.toString());
   }
   // Escape hatch
   const esc = checkEscape(speech, sess, { noPivot: true });
   if (esc.action === 'correct') {
-    const g = gather(twiml, '/appt-spell-lastname', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/appt-spell-lastname', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, "No problem! Let me back up — could you spell your last name again, one letter at a time?");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -3280,7 +3281,7 @@ app.post('/appt-collect-dob', (req, res) => {
   }
 
   sess._pendingDob = speech;
-  const g = gather(twiml, '/appt-confirm-dob', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/appt-confirm-dob', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `I have your date of birth as ${speech} — is that correct?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -3297,17 +3298,17 @@ app.post('/appt-confirm-dob', (req, res) => {
       buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm date of birth after multiple attempts');
       return res.type('text/xml').send(twiml.toString());
     }
-    const g = gather(twiml, '/appt-collect-dob', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-collect-dob', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "No problem! Let me get your date of birth again — what is it?");
     return res.type('text/xml').send(twiml.toString());
   }
   sess.dob = sess._pendingDob;
   delete sess._pendingDob;
   if (sess.patientType === 'established') {
-    const g = gather(twiml, '/appt-collect-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-collect-phone', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, pick(AFFIRMATIONS) + ' And what phone number do we have on file for you?');
   } else {
-    const g = gather(twiml, '/appt-collect-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-collect-phone', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, pick(AFFIRMATIONS) + ' And what is the best phone number to reach you?');
   }
   res.type('text/xml').send(twiml.toString());
@@ -3319,14 +3320,14 @@ app.post('/appt-collect-phone', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/appt-collect-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-collect-phone', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, pick(RETRY_PROMPTS) + ' What is your phone number?');
     return res.type('text/xml').send(twiml.toString());
   }
   // Escape hatch
   const esc = checkEscape(speech, sess, { noPivot: true });
   if (esc.action === 'correct') {
-    const g = gather(twiml, '/appt-collect-dob', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-collect-dob', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "No problem! Let me get your date of birth again — what is it?");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -3356,7 +3357,7 @@ app.post('/appt-collect-phone', (req, res) => {
   const spokenPhone = cleanDigits.length === 10
     ? `${cleanDigits.slice(0,3)}... ${cleanDigits.slice(3,6)}... ${cleanDigits.slice(6)}`
     : speech.replace(/\D/g, '').replace(/(\d{3})(\d{3})(\d{4})/, '$1... $2... $3');
-  const g = gather(twiml, '/appt-confirm-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/appt-confirm-phone', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `I have your phone number as ${spokenPhone}. Is that correct?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -3374,7 +3375,7 @@ app.post('/appt-confirm-phone', async (req, res) => {
       buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm phone number after multiple attempts');
       return res.type('text/xml').send(twiml.toString());
     }
-    const g = gather(twiml, '/appt-collect-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-collect-phone', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "No problem! Let me get your phone number again — please say each digit slowly.");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -3387,7 +3388,7 @@ app.post('/appt-confirm-phone', async (req, res) => {
   }
   if (sess.patientType === 'new') {
     // New patient: collect DOB next (then address, sex, insurance before creating full chart)
-    const g = gather(twiml, '/appt-new-collect-dob', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-new-collect-dob', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, `${pick(AFFIRMATIONS)} And what is your date of birth?`);
   } else {
     // Read back all collected info before lookup so caller can correct anything
@@ -3397,7 +3398,7 @@ app.post('/appt-confirm-phone', async (req, res) => {
     const phoneSpoken = phoneDigits.length === 10
     ? `${phoneDigits.slice(0,3)}... ${phoneDigits.slice(3,6)}... ${phoneDigits.slice(6)}`
     : (sess.collectedPhone || 'not provided');
-    const g = gather(twiml, '/appt-confirm-info', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/appt-confirm-info', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, `Perfect! Just to confirm everything before I look you up — I have your name as ${fullName}, date of birth ${dobSpoken}, and phone number ${phoneSpoken}. Is all of that correct?`);
   }
   res.type('text/xml').send(twiml.toString());
@@ -3416,7 +3417,7 @@ app.post('/appt-confirm-info', async (req, res) => {
       buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm appointment info after multiple attempts');
       return res.type('text/xml').send(twiml.toString());
     }
-    const g = gather(twiml, '/appt-confirm-info-fix', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-confirm-info-fix', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "No problem at all! What would you like to correct — your name, date of birth, or phone number?");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -3436,17 +3437,17 @@ app.post('/appt-confirm-info-fix', (req, res) => {
     return res.type('text/xml').send(twiml.toString());
   }
   if (/name|first|last/.test(speech)) {
-    const g = gather(twiml, '/appt-collect-name', { input: 'speech', speechTimeout: '3', timeout: 10 });
+    const g = gather(twiml, '/appt-collect-name', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
     say(g, "Of course! Let’s get your name again — what is your first and last name?");
   } else if (/birth|dob|date/.test(speech)) {
-    const g = gather(twiml, '/appt-collect-dob', { input: 'speech', speechTimeout: '3', timeout: 10 });
+    const g = gather(twiml, '/appt-collect-dob', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
     say(g, "No problem! What is your date of birth?");
   } else if (/phone|number/.test(speech)) {
-    const g = gather(twiml, '/appt-collect-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-collect-phone', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "Sure! What is your phone number?");
   } else {
     // Unclear — ask again
-    const g = gather(twiml, '/appt-confirm-info-fix', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-confirm-info-fix', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "I’m sorry, I didn’t catch that. Would you like to correct your name, date of birth, or phone number?");
   }
   res.type('text/xml').send(twiml.toString());
@@ -3491,7 +3492,7 @@ app.post('/appt-verify-existing', async (req, res) => {
     sess.addressOnFile = addressOnFile;
 
     // Ask patient to confirm contact info — include address if on file
-    const g = gather(twiml, '/appt-confirm-contact', { input: 'speech', speechTimeout: '3', timeout: 10 });
+    const g = gather(twiml, '/appt-confirm-contact', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
     if (addressOnFile) {
       const phoneOnFileDigits = (phoneOnFile || '').replace(/\D/g, '').slice(-10);
       const phoneOnFileSpoken = phoneOnFileDigits.length === 10
@@ -3528,12 +3529,12 @@ app.post('/appt-confirm-contact', (req, res) => {
 
   if (wantsUpdate || (!confirmed && speech.length > 0)) {
     // Ask what they want to update
-    const g = gather(twiml, '/appt-update-contact-field', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-update-contact-field', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, `No problem! What would you like to update — your phone number, email, or address?`);
   } else if (!sess.addressOnFile) {
     // No address on file — collect it now
     sess.collectedPhone = sess.phoneOnFile;
-    const g = gather(twiml, '/appt-collect-existing-address', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/appt-collect-existing-address', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, `${pick(AFFIRMATIONS)} I don't have an address on file for you yet — could you give me your current home address, including street, city, state, and zip code?`);
   } else {
     // Contact info confirmed — skip PIN (A2P pending approval) and proceed to scheduling
@@ -3554,12 +3555,12 @@ app.post('/appt-collect-existing-address', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/appt-collect-existing-address', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/appt-collect-existing-address', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, pick(RETRY_PROMPTS) + ' What is your full home address, including street, city, state, and zip code?');
     return res.type('text/xml').send(twiml.toString());
   }
   sess._pendingAddress = speech;
-  const g = gather(twiml, '/appt-confirm-existing-address', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/appt-confirm-existing-address', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `I have your address as ${speech} — is that correct?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -3576,7 +3577,7 @@ app.post('/appt-confirm-existing-address', async (req, res) => {
       buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm address after multiple attempts');
       return res.type('text/xml').send(twiml.toString());
     }
-    const g = gather(twiml, '/appt-collect-existing-address', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/appt-collect-existing-address', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, 'No problem! Let me get your address again — please give me your full address including street, city, state, and zip.');
     return res.type('text/xml').send(twiml.toString());
   }
@@ -3603,18 +3604,18 @@ app.post('/appt-update-contact-field', (req, res) => {
 
   if (/phone|number|cell|mobile/.test(speech)) {
     sess.updatingField = 'phone';
-    const g = gather(twiml, '/appt-save-contact-update', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-save-contact-update', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, `What is your new phone number?`);
   } else if (/email|e-mail/.test(speech)) {
     sess.updatingField = 'email';
-    const g = gather(twiml, '/appt-save-contact-update', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-save-contact-update', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, `What is your new email address?`);
   } else if (/address|street|moved|location/.test(speech)) {
     sess.updatingField = 'address';
-    const g = gather(twiml, '/appt-save-contact-update', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/appt-save-contact-update', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, `What is your new home address?`);
   } else {
-    const g = gather(twiml, '/appt-update-contact-field', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-update-contact-field', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, `I didn't catch that. Would you like to update your phone number, email, or address?`);
   }
   res.type('text/xml').send(twiml.toString());
@@ -3630,7 +3631,7 @@ app.post('/appt-save-contact-update', async (req, res) => {
   const sess = getSession(callSid);
 
   if (!speech) {
-    const g = gather(twiml, '/appt-save-contact-update', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-save-contact-update', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, `I didn't catch that. Please say it again.`);
     return res.type('text/xml').send(twiml.toString());
   }
@@ -3655,7 +3656,7 @@ app.post('/appt-save-contact-update', async (req, res) => {
   }
 
   // Ask if they want to update anything else
-  const g = gather(twiml, '/appt-more-updates', { input: 'speech', speechTimeout: '3', timeout: 10 });
+  const g = gather(twiml, '/appt-more-updates', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
   say(g, `Is there anything else you'd like to update?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -3670,7 +3671,7 @@ app.post('/appt-more-updates', (req, res) => {
   const sess = getSession(callSid);
 
   if (/yes|yeah|yep|also|and|another/.test(speech)) {
-    const g = gather(twiml, '/appt-update-contact-field', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-update-contact-field', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, `Of course! What else would you like to update — phone, email, or address?`);
   } else {
     // Skip PIN (A2P pending approval) — go directly to scheduling
@@ -3734,7 +3735,7 @@ app.post('/appt-send-pin', async (req, res) => {
       }, { headers: { 'Authorization': `Bearer ${CONFIG.email.resendApiKey}`, 'Content-Type': 'application/json' }, timeout: 8000 }).catch(e => console.error('[PIN EMAIL]', e.message));
     }
 
-    const g = gather(twiml, '/appt-pin-verify', { input: 'speech dtmf', speechTimeout: '3', timeout: 60 });
+    const g = gather(twiml, '/appt-pin-verify', { input: 'speech dtmf', speechTimeout: 'auto', timeout: 60 });
     say(g, isNew
       ? `I've created a 4-digit security PIN for your account and I'm sending it to you by both text and email right now. Please check your phone or email and tell me your PIN whenever you're ready — you have about 60 seconds.`
       : `I've just sent your security PIN to the phone number and email address we have on file. Please check your text messages or email and say or enter your 4-digit PIN to continue — you have about 60 seconds.`);
@@ -3768,14 +3769,14 @@ app.post('/appt-pin-verify', (req, res) => {
     }
     escalateToStaff(sess.callerPhone, 'PIN not received — patient directed to portal', `Patient: ${sess.firstName || ''} ${sess.lastName || ''} | Phone: ${sess.collectedPhone || sess.callerPhone}`).catch(() => {});
     say(twiml, `No problem at all! I've just sent the patient portal link to your phone and email right now — please check your inbox and look for an email from us. You can also visit Taylor Medical Group dot net directly and click Patient Portal in the top right corner. The portal allows you to communicate directly with our doctors, book appointments, view your invoices, and see your prescription history. Please note that we do not accept emails from patients — all requests must go through the patient portal.`);
-    const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: '3', timeout: 10 });
+    const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
     say(g, 'Is there anything else I can help you with today?');
     twiml.hangup();
     return res.type('text/xml').send(twiml.toString());
   }
 
   if (!entered) {
-    const g = gather(twiml, '/appt-pin-verify', { input: 'speech dtmf', speechTimeout: '3', timeout: 20 });
+    const g = gather(twiml, '/appt-pin-verify', { input: 'speech dtmf', speechTimeout: 'auto', timeout: 20 });
     say(g, "I didn't catch that. Please say or enter your 4-digit PIN, or let me know if you didn't receive it.");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -3785,7 +3786,7 @@ app.post('/appt-pin-verify', (req, res) => {
     const phoneOnFile = (sess.patientRecord && sess.patientRecord.Phone) ? sess.patientRecord.Phone : null;
     const emailOnFile = (sess.patientRecord && sess.patientRecord.Email) ? sess.patientRecord.Email : null;
     sess.contactVerified = false;
-    const g = gather(twiml, '/appt-verify-contact', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-verify-contact', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     if (phoneOnFile || emailOnFile) {
       let infoStr = '';
       if (phoneOnFile) infoStr += `phone as ${phoneOnFile}`;
@@ -3806,7 +3807,7 @@ app.post('/appt-pin-verify', (req, res) => {
       say(twiml, `I'm sorry, that PIN doesn't match what we have on file. For your security, I've sent a portal link to your email on file. The patient portal allows you to communicate directly with our doctors, view your invoices, book appointments, and see your prescription history. Please visit Taylor Medical Group dot net and click Patient Portal in the top right corner. Our team will also follow up with you personally.`);
       twiml.hangup();
     } else {
-      const g = gather(twiml, '/appt-pin-verify', { input: 'speech dtmf', speechTimeout: '3', timeout: 20 });
+      const g = gather(twiml, '/appt-pin-verify', { input: 'speech dtmf', speechTimeout: 'auto', timeout: 20 });
       say(g, "That PIN doesn't match. Please check your email and try again.");
     }
   }
@@ -3824,12 +3825,12 @@ app.post('/appt-new-collect-dob', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/appt-new-collect-dob', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-new-collect-dob', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, pick(RETRY_PROMPTS) + ' What is your date of birth?');
     return res.type('text/xml').send(twiml.toString());
   }
   sess._pendingDob = speech;
-  const g = gather(twiml, '/appt-new-confirm-dob', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/appt-new-confirm-dob', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `I have your date of birth as ${speech} — is that correct?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -3847,14 +3848,14 @@ app.post('/appt-new-confirm-dob', (req, res) => {
       buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm date of birth after multiple attempts');
       return res.type('text/xml').send(twiml.toString());
     }
-    const g = gather(twiml, '/appt-new-collect-dob', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-new-collect-dob', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, 'No problem! What is your date of birth?');
     return res.type('text/xml').send(twiml.toString());
   }
   sess.dob = sess._pendingDob;
   delete sess._pendingDob;
   // Proceed to address
-  const g = gather(twiml, '/appt-new-collect-address', { input: 'speech', speechTimeout: '3', timeout: 15 });
+  const g = gather(twiml, '/appt-new-collect-address', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
   say(g, `${pick(AFFIRMATIONS)} And what is your home address? Please include your street, city, state, and zip code.`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -3866,12 +3867,12 @@ app.post('/appt-new-collect-address', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/appt-new-collect-address', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/appt-new-collect-address', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, pick(RETRY_PROMPTS) + ' What is your full home address, including street, city, state, and zip code?');
     return res.type('text/xml').send(twiml.toString());
   }
   sess._pendingAddress = speech;
-  const g = gather(twiml, '/appt-new-confirm-address', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/appt-new-confirm-address', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `I have your address as ${speech} — is that correct?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -3889,14 +3890,14 @@ app.post('/appt-new-confirm-address', (req, res) => {
       buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm address after multiple attempts');
       return res.type('text/xml').send(twiml.toString());
     }
-    const g = gather(twiml, '/appt-new-collect-address', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/appt-new-collect-address', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, 'No problem! Let me get your address again — please give me your full address including street, city, state, and zip.');
     return res.type('text/xml').send(twiml.toString());
   }
   sess.address = sess._pendingAddress;
   delete sess._pendingAddress;
   // Proceed to sex/gender
-  const g = gather(twiml, '/appt-new-collect-sex', { input: 'speech', speechTimeout: '3', timeout: 10 });
+  const g = gather(twiml, '/appt-new-collect-sex', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
   say(g, `${pick(AFFIRMATIONS)} And what is your biological sex — male or female?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -3915,12 +3916,12 @@ app.post('/appt-new-collect-sex', (req, res) => {
     sess.gender = 'Other';
   } else {
     // Didn't catch it — ask again
-    const g = gather(twiml, '/appt-new-collect-sex', { input: 'speech', speechTimeout: '3', timeout: 10 });
+    const g = gather(twiml, '/appt-new-collect-sex', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
     say(g, pick(RETRY_PROMPTS) + ' What is your biological sex — male or female?');
     return res.type('text/xml').send(twiml.toString());
   }
   // Proceed to emergency contact collection
-  const g = gather(twiml, '/appt-new-collect-emergency-name', { input: 'speech', speechTimeout: '3', timeout: 15 });
+  const g = gather(twiml, '/appt-new-collect-emergency-name', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
   say(g, `${pick(AFFIRMATIONS)} And for your chart, I need an emergency contact. What is your emergency contact's full name?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -3932,12 +3933,12 @@ app.post('/appt-new-collect-emergency-name', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/appt-new-collect-emergency-name', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/appt-new-collect-emergency-name', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, pick(RETRY_PROMPTS) + " What is your emergency contact's full name?");
     return res.type('text/xml').send(twiml.toString());
   }
   sess.emergencyContactName = normalizeName(speech);
-  const g = gather(twiml, '/appt-new-collect-emergency-phone', { input: 'speech', speechTimeout: '3', timeout: 15 });
+  const g = gather(twiml, '/appt-new-collect-emergency-phone', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
   say(g, `Got it — ${sess.emergencyContactName}. And what is their phone number?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -3949,14 +3950,14 @@ app.post('/appt-new-collect-emergency-phone', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/appt-new-collect-emergency-phone', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/appt-new-collect-emergency-phone', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, pick(RETRY_PROMPTS) + " What is their phone number?");
     return res.type('text/xml').send(twiml.toString());
   }
   const digits = speech.replace(/\D/g, '').slice(-10);
   sess.emergencyContactPhone = digits.length >= 10 ? `+1${digits}` : speech;
   // Read back emergency contact for confirmation
-  const g = gather(twiml, '/appt-new-confirm-emergency', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/appt-new-confirm-emergency', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `I have your emergency contact as ${sess.emergencyContactName} at ${speech} — is that correct?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -3974,7 +3975,7 @@ app.post('/appt-new-confirm-emergency', (req, res) => {
       buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm emergency contact after multiple attempts');
       return res.type('text/xml').send(twiml.toString());
     }
-    const g = gather(twiml, '/appt-new-collect-emergency-name', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/appt-new-collect-emergency-name', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, "No problem! Let me get that again — what is your emergency contact's full name?");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -4036,14 +4037,14 @@ app.post('/appt-collect-address', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/appt-collect-address', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/appt-collect-address', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, pick(RETRY_PROMPTS) + ' What is your full home address, including street, city, state, and zip code?');
     return res.type('text/xml').send(twiml.toString());
   }
   // Escape hatch
   const esc = checkEscape(speech, sess, { noPivot: true });
   if (esc.action === 'correct') {
-    const g = gather(twiml, '/appt-collect-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-collect-phone', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "No problem! Let me get your phone number again — what is it?");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -4063,7 +4064,7 @@ app.post('/appt-collect-address', (req, res) => {
 
   // Read back address for confirmation
   sess._pendingAddress = speech;
-  const g = gather(twiml, '/appt-confirm-address', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/appt-confirm-address', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `I have your address as ${speech} — is that correct?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -4080,7 +4081,7 @@ app.post('/appt-confirm-address', async (req, res) => {
       buildEscalationResponse(twiml, callerPhone, callSid, 'Could not confirm address after multiple attempts');
       return res.type('text/xml').send(twiml.toString());
     }
-    const g = gather(twiml, '/appt-collect-address', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/appt-collect-address', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, "No problem! Let me get your address again — please give me your full address including street, city, state, and zip.");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -4105,10 +4106,10 @@ app.post('/appt-collect-visit-reason', (req, res) => {
   const sess = getSession(callSid);
   const isNew = sess.patientType === 'new';
   if (isNew) {
-    const g = gather(twiml, '/appt-save-visit-reason', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/appt-save-visit-reason', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, `Before I pull up our schedule, is there anything specific you’d like the doctor to know before your appointment? For example, any symptoms, concerns, or questions you want to make sure are addressed? If you have a lot of detail to share, I can also send you the patient portal link so you can message the doctors directly.`);
   } else {
-    const g = gather(twiml, '/appt-save-visit-reason', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/appt-save-visit-reason', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, `Before I pull up our schedule, can you tell me the main reason for your visit? For example, is this for medication management, a follow-up on your treatment, reviewing labs, or something else?`);
   }
   res.type('text/xml').send(twiml.toString());
@@ -4165,7 +4166,7 @@ app.post('/appt-find-slots', async (req, res) => {
     let slotScript = `I found some great options for you! `;
     offered.forEach((slot, i) => { slotScript += `Option ${i + 1} is ${slot.label}. `; });
     slotScript += `If none of those work for you, just say sooner and I'll reach out to the office. Otherwise, just tell me which option you'd like.`;
-    const g = gather(twiml, '/appt-select-slot', { input: 'speech dtmf', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-select-slot', { input: 'speech dtmf', speechTimeout: 'auto', timeout: 12 });
     say(g, slotScript);
   } catch (err) {
     console.error('[SLOTS]', err.message);
@@ -4185,7 +4186,7 @@ app.post('/appt-select-slot', (req, res) => {
   const sess = getSession(callSid);
   const wantsSooner = digit === '4' || /soon|earlier|sooner|before|faster|urgent|this week|next week/.test(speech);
   if (wantsSooner) {
-    const g = gather(twiml, '/appt-sooner-date', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/appt-sooner-date', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "Of course! What date and time works best for you?");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -4199,7 +4200,7 @@ app.post('/appt-select-slot', (req, res) => {
       buildEscalationResponse(twiml, callerPhone, callSid, 'Could not select appointment slot after multiple attempts');
       return res.type('text/xml').send(twiml.toString());
     }
-    const g = gather(twiml, '/appt-select-slot', { input: 'speech dtmf', speechTimeout: '3', timeout: 10 });
+    const g = gather(twiml, '/appt-select-slot', { input: 'speech dtmf', speechTimeout: 'auto', timeout: 10 });
     say(g, "Just say option 1, 2, or 3 to choose your time, or say sooner if you need an earlier appointment.");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -4308,7 +4309,7 @@ app.post('/call-complete-check', (req, res) => {
   const hasMore = /yes|yeah|yep|sure|actually|also|one more|another|i have|i do/.test(speech);
   if (hasMore) {
     // Caller has a different question — route to general help, NOT booking flow
-    const g = gather(twiml, '/general-help', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/general-help', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "Of course! What else can I help you with today?");
   } else {
     say(twiml, "Wonderful! Thank you so much for calling Taylor Medical Group. Have a great day!");
@@ -4343,7 +4344,7 @@ app.post('/general-help', (req, res) => {
   } else if (/refill|prescription|medication/.test(speech)) {
     twiml.redirect('/refill-start');
   } else {
-    const g = gather(twiml, '/message-collect', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/message-collect', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "Of course! Please go ahead and tell me what you need, and I'll make sure the team gets your message.");
   }
   res.type('text/xml').send(twiml.toString());
@@ -4395,7 +4396,7 @@ app.post('/nonpatient-info', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   sess.callerPhone = callerPhone;
-  const g = gather(twiml, '/nonpatient-message', { input: 'speech', speechTimeout: '3', timeout: 20 });
+  const g = gather(twiml, '/nonpatient-message', { input: 'speech', speechTimeout: 'auto', timeout: 20 });
   say(g, "Thank you for reaching out to Taylor Med-ical Group. I'd be happy to take a message for our team. Please go ahead and share your name, the reason for your call, and the best way to reach you, and I'll make sure the right person gets back to you.");
   res.type('text/xml').send(twiml.toString());
 });
@@ -4407,7 +4408,7 @@ app.post('/nonpatient-message', async (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/nonpatient-message', { input: 'speech', speechTimeout: '3', timeout: 20 });
+    const g = gather(twiml, '/nonpatient-message', { input: 'speech', speechTimeout: 'auto', timeout: 20 });
     say(g, "I didn't catch that. Please go ahead and leave your message for our team.");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -4425,7 +4426,7 @@ app.post('/nonpatient-message', async (req, res) => {
     </div>`, body).catch(() => {});
   sendCallSummaryToStaff(callerPhone, `Reason: Non-patient message\nCaller: ${callerName}\nMessage: ${speech}\nOutcome: Staff emailed`).catch(() => {});
   say(twiml, "Perfect! I've sent your message to our team and they'll follow up with you. Is there anything else I can help you with today?");
-  const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: '3', timeout: 10 });
+  const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
   say(g, '');
   twiml.hangup();
   res.type('text/xml').send(twiml.toString());
@@ -4436,7 +4437,7 @@ app.post('/nonpatient-message', async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 app.post('/transfer-triage', (req, res) => {
   const twiml = new VoiceResponse();
-  const g = gather(twiml, '/transfer-triage-response', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/transfer-triage-response', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, "Of course! I can't transfer calls directly, but I'll make sure our team gets your message right away. Please go ahead and tell me what you'd like them to know.");
   twiml.redirect('/transfer-triage-response');
   res.type('text/xml').send(twiml.toString());
@@ -4456,7 +4457,7 @@ app.post('/transfer-triage-response', (req, res) => {
 
   if (isNewPatient) {
     sess.patientType = 'new';
-    const g = gather(twiml, '/lead-collect-name', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/lead-collect-name', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "Wonderful! We'd love to have you as a new patient. Let me get a little information to get you started. What is your full name?");
   } else if (isExistingPatient) {
     sess.patientType = 'established';
@@ -4467,12 +4468,12 @@ app.post('/transfer-triage-response', (req, res) => {
     twiml.redirect('/sales-start');
   } else if (!speech) {
     // No speech — re-ask
-    const g = gather(twiml, '/transfer-triage-response', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/transfer-triage-response', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "I'm sorry, I didn't catch that. Are you a new patient, an existing patient, or calling from a pharmacy?");
     twiml.redirect('/transfer-triage-response');
   } else {
     // Unknown — ask if sales
-    const g = gather(twiml, '/transfer-sales-check', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/transfer-sales-check', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "Got it. Is this a sales or business call?");
     twiml.redirect('/transfer-sales-check');
   }
@@ -4492,15 +4493,15 @@ app.post('/transfer-sales-check', (req, res) => {
   if (isYes) {
     // Sales call — take info and give business email with disclaimer
     sess._callerType = 'sales';
-    const g = gather(twiml, '/sales-collect-info', { input: 'speech', speechTimeout: '3', timeout: 20 });
+    const g = gather(twiml, '/sales-collect-info', { input: 'speech', speechTimeout: 'auto', timeout: 20 });
     say(g, "No problem! Please go ahead and tell me your name, your company, and what product or service you're offering. I'll make sure our team gets your information.");
   } else if (isNo) {
     // Not sales — take a message for staff
-    const g = gather(twiml, '/take-message-content', { input: 'speech', speechTimeout: '3', timeout: 20 });
+    const g = gather(twiml, '/take-message-content', { input: 'speech', speechTimeout: 'auto', timeout: 20 });
     say(g, "Of course! Please go ahead and leave a detailed message for our team and they will follow up with you shortly.");
   } else {
     // No clear answer — default to take message
-    const g = gather(twiml, '/take-message-content', { input: 'speech', speechTimeout: '3', timeout: 20 });
+    const g = gather(twiml, '/take-message-content', { input: 'speech', speechTimeout: 'auto', timeout: 20 });
     say(g, "Of course! Please go ahead and leave a detailed message for our team and they will follow up with you shortly.");
   }
   res.type('text/xml').send(twiml.toString());
@@ -4514,7 +4515,7 @@ app.post('/sales-collect-info', async (req, res) => {
   const sess = getSession(callSid);
 
   if (!speech) {
-    const g = gather(twiml, '/sales-collect-info', { input: 'speech', speechTimeout: '3', timeout: 20 });
+    const g = gather(twiml, '/sales-collect-info', { input: 'speech', speechTimeout: 'auto', timeout: 20 });
     say(g, "I didn't catch that. Please tell me your name, company, and what you're offering.");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -4524,7 +4525,7 @@ app.post('/sales-collect-info', async (req, res) => {
   sendCallSummaryToStaff(callerPhone, `Reason: Sales call\nInfo: ${speech}\nOutcome: Directed to business email`).catch(() => {});
 
   say(twiml, `Thank you! I've noted your information and our team will review it. You can also email us directly at info at Taylor Medical Group dot net — that's I-N-F-O at T-A-Y-L-O-R M-E-D-I-C-A-L G-R-O-U-P dot net. Please note — this email address is for business inquiries only. All patient communications must go through our patient portal at Taylor Medical dot IntakeQ dot com forward slash portal. Is there anything else I can help you with?`);
-  const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: '3', timeout: 10 });
+  const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
   say(g, '');
   twiml.hangup();
   res.type('text/xml').send(twiml.toString());
@@ -4542,7 +4543,7 @@ app.post('/transfer-info', (req, res) => {
   // Per Dr. Taylor's protocol: all direct patient-to-doctor communication goes through the patient portal
   say(twiml, "I completely understand, and I want to make sure you get the best help possible. Our doctors have asked that all direct patient communication go through our secure patient portal — that way they can respond to you personally. I'm sending you the portal link right now by text!");
   sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nPatient Portal (appointments, prescriptions, lab results, messages):\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n🗺️ Get Directions:\n${CONFIG.practice.mapsLink}\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.\n\nQuestions? Call 678-443-4000`).catch(() => {});
-  const g = gather(twiml, '/take-message-content', { input: 'speech', speechTimeout: '3', timeout: 20 });
+  const g = gather(twiml, '/take-message-content', { input: 'speech', speechTimeout: 'auto', timeout: 20 });
   say(g, "Is there anything else I can help you with today, or would you also like to leave a message for our team?");
   res.type('text/xml').send(twiml.toString());
 });
@@ -4554,7 +4555,7 @@ app.post('/take-message-content', async (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/take-message-content', { input: 'speech', speechTimeout: '3', timeout: 20 });
+    const g = gather(twiml, '/take-message-content', { input: 'speech', speechTimeout: 'auto', timeout: 20 });
     say(g, "I didn't catch that. Please go ahead and leave your message for our team.");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -4564,7 +4565,7 @@ app.post('/take-message-content', async (req, res) => {
   // If we don't have an email for this caller yet, capture it before closing — every caller is a potential lead
   if (!sess.email && !sess.emailOnFile) {
     sess._messageAlreadySent = false;
-    const g = gather(twiml, '/take-message-email', { input: 'speech', speechTimeout: '4', timeout: 15 });
+    const g = gather(twiml, '/take-message-email', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, "Got it! I've noted your message. Before I let you go, what's the best email address for you? That way our team can follow up by email as well.");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -4572,7 +4573,7 @@ app.post('/take-message-content', async (req, res) => {
   await escalateToStaff(callerPhone, `💬 Message from ${callerName}`, `Caller: ${callerName}\nPhone: ${callerPhone}\nEmail: ${sess.email || sess.emailOnFile || 'N/A'}\nMessage: ${speech}`).catch(() => {});
   sendCallSummaryToStaff(callerPhone, `Reason: Message taken\nCaller: ${callerName}\nMessage: ${speech}\nOutcome: Staff notified by text`, callSid).catch(() => {});
   say(twiml, "Perfect! I've sent your message to our team right now and they'll follow up with you shortly. Is there anything else I can help you with today?");
-  const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: '3', timeout: 10 });
+  const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
   say(g, "");
   twiml.hangup();
   res.type('text/xml').send(twiml.toString());
@@ -4594,7 +4595,7 @@ app.post('/take-message-email', async (req, res) => {
     sess.email = emailMatch[0].toLowerCase();
   } else if (speech.length > 2 && !/^(no|nope|skip|pass|don.?t|none|n.?a|not|i don|i don't)$/i.test(speech)) {
     // Couldn't parse as email but caller said something — store as-is and ask to confirm
-    const g = gather(twiml, '/take-message-email-confirm', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/take-message-email-confirm', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, `I have your email as ${speech} — is that correct?`);
     sess._pendingEmail = speech;
     return res.type('text/xml').send(twiml.toString());
@@ -4605,7 +4606,7 @@ app.post('/take-message-email', async (req, res) => {
   await escalateToStaff(callerPhone, `💬 Message from ${callerName}`, `Caller: ${callerName}\nPhone: ${callerPhone}\nEmail: ${emailStr}\nMessage: ${message}`).catch(() => {});
   sendCallSummaryToStaff(callerPhone, `Reason: Message taken\nCaller: ${callerName}\nMessage: ${message}\nEmail: ${emailStr}\nOutcome: Staff notified`, callSid).catch(() => {});
   say(twiml, "Perfect! I've sent your message and contact info to our team. They'll be in touch soon. Is there anything else I can help you with today?");
-  const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: '3', timeout: 10 });
+  const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
   say(g, '');
   twiml.hangup();
   res.type('text/xml').send(twiml.toString());
@@ -4625,7 +4626,7 @@ app.post('/take-message-email-confirm', async (req, res) => {
     delete sess._pendingEmail;
   } else if (!confirmed) {
     // Re-ask
-    const g = gather(twiml, '/take-message-email', { input: 'speech', speechTimeout: '4', timeout: 15 });
+    const g = gather(twiml, '/take-message-email', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, "No problem! Could you give me your email address again?");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -4633,7 +4634,7 @@ app.post('/take-message-email-confirm', async (req, res) => {
   await escalateToStaff(callerPhone, `💬 Message from ${callerName}`, `Caller: ${callerName}\nPhone: ${callerPhone}\nEmail: ${emailStr}\nMessage: ${message}`).catch(() => {});
   sendCallSummaryToStaff(callerPhone, `Reason: Message taken\nCaller: ${callerName}\nMessage: ${message}\nEmail: ${emailStr}\nOutcome: Staff notified`, callSid).catch(() => {});
   say(twiml, "Perfect! I've sent your message and contact info to our team. They'll be in touch soon. Is there anything else I can help you with today?");
-  const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: '3', timeout: 10 });
+  const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
   say(g, '');
   twiml.hangup();
   res.type('text/xml').send(twiml.toString());
@@ -4681,7 +4682,7 @@ app.post('/iv-info', (req, res) => {
   say(twiml, `${ivDetail}Unlike many other clinics, our doctors personally administer all IV treatments. All patients must first be evaluated by one of our doctors prior to receiving IV therapy — this can often be done on the same day as your first treatment. The doctor will review your medical history and recommend the IV that is right for you. Please visit Taylor Medical Group dot net and click Patient Portal in the top right corner to book your IV therapy appointment.`);
   sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nIV Therapy: Our doctors personally administer all IV treatments. An IV evaluation consult is required prior to treatment (can be same day).\n\nIV options: Myers Cocktail, NAD+, Vitamin C, Glutathione, Iron Infusion, Chelation, Hydrogen Peroxide, Ozone, Ketamine, and more.\n\nBook your IV consult:\n${CONFIG.intakeq.bookingUrl}\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n🗺️ Get Directions:\n${CONFIG.practice.mapsLink}\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.\n\nQuestions? Call 678-443-4000`).catch(() => {});
   sendCallSummaryToStaff(callerPhone, `Reason: IV therapy inquiry\nSpeech: "${speech}"\nOutcome: Booking link sent`).catch(() => {});
-  const g = gather(twiml, '/appt-schedule-confirm', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/appt-schedule-confirm', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, "Would you like to go ahead and schedule your IV evaluation today?");
   res.type('text/xml').send(twiml.toString());
 });
@@ -4698,7 +4699,7 @@ app.post('/appt-schedule-confirm', (req, res) => {
   } else {
     say(twiml, `No problem at all! Whenever you are ready, you can book online any time at Taylor Medical Group dot net — just click Book Now. I am also texting you the link right now. Is there anything else I can help you with today?`);
     sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nBook Your IV Evaluation online 24/7:\n${CONFIG.intakeq.bookingUrl}\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n🗺️ Get Directions:\n${CONFIG.practice.mapsLink}\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.\n\nQuestions? Call 678-443-4000`).catch(() => {});
-    const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: '3', timeout: 10 });
+    const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
     say(g, '');
     twiml.hangup();
   }
@@ -4862,7 +4863,7 @@ app.post('/pharmacy-start', (req, res) => {
   sess.callerPhone = callerPhone;
   sess.isPharmacy = true;
   sess._callerType = 'pharmacy';
-  const g = gather(twiml, '/pharmacy-pharmacist-name', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/pharmacy-pharmacist-name', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, "Thank you for calling Taylor Medical Group! I'd be happy to assist you. Could I please start with your name and the name of your pharmacy?");
   res.type('text/xml').send(twiml.toString());
 });
@@ -4873,12 +4874,12 @@ app.post('/pharmacy-pharmacist-name', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/pharmacy-pharmacist-name', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/pharmacy-pharmacist-name', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "I didn't catch that. Could you please tell me your name and the name of your pharmacy?");
     return res.type('text/xml').send(twiml.toString());
   }
   sess.pharmacistName = normalizeName(speech);
-  const g = gather(twiml, '/pharmacy-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/pharmacy-phone', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, "Thank you! What is the best phone number for your pharmacy?");
   res.type('text/xml').send(twiml.toString());
 });
@@ -4889,12 +4890,12 @@ app.post('/pharmacy-phone', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/pharmacy-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/pharmacy-phone', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "I didn't catch that. What is the pharmacy phone number?");
     return res.type('text/xml').send(twiml.toString());
   }
   sess.pharmacyPhone = speech;
-  const g = gather(twiml, '/pharmacy-fax', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/pharmacy-fax', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, "Got it. And what is your fax number?");
   res.type('text/xml').send(twiml.toString());
 });
@@ -4905,7 +4906,7 @@ app.post('/pharmacy-fax', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   sess.pharmacyFax = speech || 'not provided';
-  const g = gather(twiml, '/pharmacy-email', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/pharmacy-email', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, "Thank you. Do you have an email address for the pharmacy?");
   res.type('text/xml').send(twiml.toString());
 });
@@ -4917,7 +4918,7 @@ app.post('/pharmacy-email', (req, res) => {
   const sess = getSession(callSid);
   const noEmail = /no|don.t|don.t have|none|not/.test(speech);
   sess.pharmacyEmail = noEmail ? 'not provided' : (speech || 'not provided');
-  const g = gather(twiml, '/pharmacy-patient-name', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/pharmacy-patient-name', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, "Perfect. Now I need some information about the patient. Could you please tell me the patient's full name?");
   res.type('text/xml').send(twiml.toString());
 });
@@ -4928,12 +4929,12 @@ app.post('/pharmacy-patient-name', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/pharmacy-patient-name', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/pharmacy-patient-name', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "I didn't catch that. What is the patient's full name?");
     return res.type('text/xml').send(twiml.toString());
   }
   sess.rxPatientName = normalizeName(speech);
-  const g = gather(twiml, '/pharmacy-patient-dob', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/pharmacy-patient-dob', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, "Thank you. And what is the patient's date of birth?");
   res.type('text/xml').send(twiml.toString());
 });
@@ -4944,12 +4945,12 @@ app.post('/pharmacy-patient-dob', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/pharmacy-patient-dob', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/pharmacy-patient-dob', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "I didn't catch that. What is the patient's date of birth?");
     return res.type('text/xml').send(twiml.toString());
   }
   sess.rxPatientDob = speech;
-  const g = gather(twiml, '/pharmacy-patient-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/pharmacy-patient-phone', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, "Got it. And the patient's phone number?");
   res.type('text/xml').send(twiml.toString());
 });
@@ -4960,7 +4961,7 @@ app.post('/pharmacy-patient-phone', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   sess.rxPatientPhone = speech || 'not provided';
-  const g = gather(twiml, '/pharmacy-patient-address', { input: 'speech', speechTimeout: '3', timeout: 15 });
+  const g = gather(twiml, '/pharmacy-patient-address', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
   say(g, "And the patient's address?");
   res.type('text/xml').send(twiml.toString());
 });
@@ -4971,7 +4972,7 @@ app.post('/pharmacy-patient-address', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   sess.rxPatientAddress = speech || 'not provided';
-  const g = gather(twiml, '/pharmacy-rx-name', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/pharmacy-rx-name', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, "Thank you. Now let's get the prescription details. What is the name of the medication?");
   res.type('text/xml').send(twiml.toString());
 });
@@ -4982,12 +4983,12 @@ app.post('/pharmacy-rx-name', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/pharmacy-rx-name', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/pharmacy-rx-name', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "I didn't catch that. What is the name of the medication?");
     return res.type('text/xml').send(twiml.toString());
   }
   sess.rxName = speech;
-  const g = gather(twiml, '/pharmacy-rx-dosage', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/pharmacy-rx-dosage', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, "Got it. What is the dosage?");
   res.type('text/xml').send(twiml.toString());
 });
@@ -4998,7 +4999,7 @@ app.post('/pharmacy-rx-dosage', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   sess.rxDosage = speech || 'not provided';
-  const g = gather(twiml, '/pharmacy-rx-instructions', { input: 'speech', speechTimeout: '3', timeout: 15 });
+  const g = gather(twiml, '/pharmacy-rx-instructions', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
   say(g, "And the instructions — how is it to be taken?");
   res.type('text/xml').send(twiml.toString());
 });
@@ -5009,7 +5010,7 @@ app.post('/pharmacy-rx-instructions', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   sess.rxInstructions = speech || 'not provided';
-  const g = gather(twiml, '/pharmacy-rx-quantity', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/pharmacy-rx-quantity', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, "What quantity is being requested?");
   res.type('text/xml').send(twiml.toString());
 });
@@ -5020,7 +5021,7 @@ app.post('/pharmacy-rx-quantity', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   sess.rxQuantity = speech || 'not provided';
-  const g = gather(twiml, '/pharmacy-rx-refills', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/pharmacy-rx-refills', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, "And how many refills are being requested?");
   res.type('text/xml').send(twiml.toString());
 });
@@ -5031,7 +5032,7 @@ app.post('/pharmacy-rx-refills', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   sess.rxRefills = speech || 'not provided';
-  const g = gather(twiml, '/pharmacy-message', { input: 'speech', speechTimeout: '3', timeout: 20 });
+  const g = gather(twiml, '/pharmacy-message', { input: 'speech', speechTimeout: 'auto', timeout: 20 });
   say(g, "Is there any additional message or special instructions you'd like to include for the doctor?");
   res.type('text/xml').send(twiml.toString());
 });
@@ -5139,7 +5140,7 @@ Appointment History: ${lastApptNote}`;
     : '';
 
   say(twiml, `Thank you so much for that information! I've sent a detailed message to our entire team right now and they will follow up with you as soon as possible.${warningScript} In the meantime, our preferred method is for you to fax your request to 6 7 8, 4 4 3, 4 0 9 0, or email us at info at taylormedicalgroup dot net. Is there anything else I can help you with today?`);
-  const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: '3', timeout: 10 });
+  const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: 'auto', timeout: 10 });
   say(g, '');
   twiml.hangup();
   res.type('text/xml').send(twiml.toString());
@@ -5158,7 +5159,7 @@ app.post('/sales-start', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   sess._callerType = 'sales';
-  const g = gather(twiml, '/sales-collect-name', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/sales-collect-name', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `Thank you for reaching out to Taylor Med-ical Group! I'd be happy to take down your information. May I start with your name and the company you're calling from?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -5169,12 +5170,12 @@ app.post('/sales-collect-name', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/sales-collect-name', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/sales-collect-name', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "I didn't catch that. Could you please give me your name and company?");
     return res.type('text/xml').send(twiml.toString());
   }
   sess.salesName = normalizeName(speech);
-  const g = gather(twiml, '/sales-collect-service', { input: 'speech', speechTimeout: '3', timeout: 15 });
+  const g = gather(twiml, '/sales-collect-service', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
   say(g, `Thank you! What product or service are you offering, and how do you think it could benefit our practice?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -5185,12 +5186,12 @@ app.post('/sales-collect-service', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/sales-collect-service', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    const g = gather(twiml, '/sales-collect-service', { input: 'speech', speechTimeout: 'auto', timeout: 15 });
     say(g, "I didn't catch that. What product or service are you offering?");
     return res.type('text/xml').send(twiml.toString());
   }
   sess.salesService = speech;
-  const g = gather(twiml, '/sales-collect-website', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/sales-collect-website', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `That's helpful, thank you! Do you have a website our team can visit to learn more?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -5201,7 +5202,7 @@ app.post('/sales-collect-website', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   sess.salesWebsite = speech || 'not provided';
-  const g = gather(twiml, '/sales-collect-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  const g = gather(twiml, '/sales-collect-phone', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
   say(g, `Great! And what is the best phone number to reach you?`);
   res.type('text/xml').send(twiml.toString());
 });
@@ -5212,7 +5213,7 @@ app.post('/sales-collect-phone', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   if (!speech) {
-    const g = gather(twiml, '/sales-collect-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    const g = gather(twiml, '/sales-collect-phone', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
     say(g, "I didn't catch that. What is your phone number?");
     return res.type('text/xml').send(twiml.toString());
   }
@@ -5355,7 +5356,7 @@ app.post('/silence-check', (req, res) => {
     twiml.hangup();
   } else {
     // First silence - ask if still there
-    const g = twiml.gather({ input: 'speech', speechTimeout: '3', timeout: 10, action: `/silence-check?attempt=2`, method: 'POST' });
+    const g = twiml.gather({ input: 'speech', speechTimeout: 'auto', timeout: 10, action: `/silence-check?attempt=2`, method: 'POST' });
     g.say({ voice: 'Polly.Danielle-Neural', language: 'en-US' },
       '<speak><prosody rate="85%">Are you still there? Take your time — I\'m here whenever you\'re ready.</prosody></speak>');
   }
@@ -5365,7 +5366,7 @@ app.post('/silence-check', (req, res) => {
 // Silence check — ask "are you still there?" before hanging up
 app.post('/silence-check', (req, res) => {
   const twiml = new VoiceResponse();
-  const g = gather(twiml, '/silence-final', { input: 'speech', speechTimeout: '3', timeout: 8 });
+  const g = gather(twiml, '/silence-final', { input: 'speech', speechTimeout: 'auto', timeout: 8 });
   say(g, "Are you still there? If you need help, please say yes or press any key.");
   twiml.redirect('/silence-final');
   res.type('text/xml').send(twiml.toString());
