@@ -4863,8 +4863,19 @@ app.post('/pharmacy-start', (req, res) => {
   sess.callerPhone = callerPhone;
   sess.isPharmacy = true;
   sess._callerType = 'pharmacy';
-  const g = gather(twiml, '/pharmacy-pharmacist-name', { input: 'speech', speechTimeout: 'auto', timeout: 12 });
-  say(g, "Thank you for calling Taylor Medical Group! I'd be happy to assist you. Could I please start with your name and the name of your pharmacy?");
+
+  // Redirect pharmacists to email — we do not accept calls or faxes from pharmacies
+  say(twiml, 
+    "Thank you for calling Taylor Medical Group. " +
+    "Please note that we do not accept prescription requests or pharmacy inquiries by phone or fax. " +
+    "All pharmacy requests must be submitted by email to info at Taylor Medical Group dot net. " +
+    "That is info at taylormedicalgroup dot net. " +
+    "Please include the patient name, date of birth, medication name, and your pharmacy contact information in your email. " +
+    "We will respond to your email as promptly as possible. " +
+    "Thank you and have a great day."
+  );
+  sendCallSummaryToStaff(callerPhone, 'Pharmacy call received — redirected to email: info@taylormedicalgroup.net').catch(() => {});
+  twiml.hangup();
   res.type('text/xml').send(twiml.toString());
 });
 
