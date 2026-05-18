@@ -337,6 +337,16 @@ const SPEECH_HINTS = [
   // Common spelled letters (for name spelling)
   'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
   'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+  // NATO phonetic alphabet — prevents P/T/B/D/E mishearing during name spelling
+  'Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot', 'Golf', 'Hotel',
+  'India', 'Juliet', 'Kilo', 'Lima', 'Mike', 'November', 'Oscar', 'Papa',
+  'Quebec', 'Romeo', 'Sierra', 'Tango', 'Uniform', 'Victor', 'Whiskey',
+  'X-ray', 'Yankee', 'Zulu',
+  // Digit words — critical for phone number transcription accuracy
+  'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
+  'oh', 'double', 'triple',
+  // Common US area codes for the practice
+  '678', '404', '770', '470', '706', '912', '229', '478',
 ];
 
 // ─── Language detection ─────────────────────────────────────────────────────
@@ -535,7 +545,30 @@ async function sendCallSummaryToStaff(callerPhone, summary, callSid = null, tran
     }
   }
 
-  const msg = `📋 TMG Call Summary — ${now} ET\n📱 Caller: ${callerPhone}\n─────────────────────\n${summary}${recordingLine}`;
+  // Build contact card from session data if callSid is available
+  let contactCard = '';
+  let contactCardHtml = '';
+  if (callSid) {
+    const sess = getSession(callSid);
+    if (sess) {
+      const name = [sess.firstName, sess.lastName].filter(Boolean).join(' ') || '[not collected]';
+      const email = sess.email || sess.emailOnFile || '[not collected]';
+      const phone = sess.collectedPhone || callerPhone || '[unknown]';
+      contactCard = `\n📇 CONTACT INFO\nName:  ${name}\nPhone: ${phone}\nEmail: ${email}`;
+      contactCardHtml = `
+        <div style="background:#f0fff4; border:1px solid #9ae6b4; border-radius:8px; padding:16px; margin:16px 0;">
+          <p style="margin:0 0 8px 0; font-size:15px; font-weight:bold; color:#276749;">📇 Contact Info</p>
+          <table style="font-size:14px; border-collapse:collapse;">
+            <tr><td style="padding:3px 12px 3px 0; color:#4a5568; font-weight:bold;">Name</td><td style="padding:3px 0;">${name}</td></tr>
+            <tr><td style="padding:3px 12px 3px 0; color:#4a5568; font-weight:bold;">Phone</td><td style="padding:3px 0;"><a href="tel:${phone}" style="color:#2b6cb0;">${phone}</a></td></tr>
+            <tr><td style="padding:3px 12px 3px 0; color:#4a5568; font-weight:bold;">Email</td><td style="padding:3px 0;"><a href="mailto:${email}" style="color:#2b6cb0;">${email}</a></td></tr>
+          </table>
+        </div>
+      `;
+    }
+  }
+
+  const msg = `📋 TMG Call Summary — ${now} ET\n📱 Caller: ${callerPhone}${contactCard}\n─────────────────────\n${summary}${recordingLine}`;
 
   // SMS (may be blocked by A2P issue — email is primary)
   for (const num of CONFIG.escalation.smsNumbers) await sendSms(num, msg).catch(() => {});
@@ -548,6 +581,7 @@ async function sendCallSummaryToStaff(callerPhone, summary, callSid = null, tran
       </h2>
       <p><strong>Time:</strong> ${now} ET</p>
       <p><strong>Caller:</strong> ${callerPhone}</p>
+      ${contactCardHtml}
       ${recordingHtml}
       <hr style="border: 1px solid #e2e8f0;" />
       <div style="background: #f7fafc; padding: 16px; border-radius: 8px; white-space: pre-wrap; font-size: 14px;">
@@ -1398,7 +1432,18 @@ app.post('/intake-firstname', (req, res) => {
 
   // Filter out filler phrases that are not names
   const FILLER_PHRASES = /^(hi|hello|hey|hi there|hello there|good morning|good afternoon|good evening|thank you|thanks|sure|okay|ok|yes|yeah|yep|uh huh|um|uh|hmm|oh|oh hi|oh hello|oh okay|oh sure)([.!?,]?\s*.*)?$/i;
-  if (!speech || speech.length < 2 || FILLER_PHRASES.test(speech.trim())) {
+  // Non-name words — common misdirections that must never be stored as a caller's name
+  const NON_NAME_WORDS = /^(no|nope|not|stop|wait|hold on|front desk|transfer|operator|human|agent|someone|staff|doctor|dr|nurse|help|please|what|who|why|how|when|where|i don|i need|i want|i have|i am|i'm|can you|could you|would you|is this|are you|do you|yes please|no thank|never mind|nevermind|forget it|cancel|quit|exit|bye|goodbye|hang up)([.!?,\s].*)?$/i;
+  if (!speech || speech.length < 2 || FILLER_PHRASES.test(speech.trim()) || NON_NAME_WORDS.test(speech.trim())) {
+    // If they said something that sounds like a request (not a name), detect intent first
+    const possibleIntent = detectIntent(speech);
+    if (possibleIntent && possibleIntent !== 'unknown' && possibleIntent !== 'greeting') {
+      // Store caller phone and redirect to main-intent to handle their actual request
+      sess.firstName = sess.firstName || null;
+      sess.lastName = sess.lastName || null;
+      twiml.redirect('/main-intent');
+      return res.type('text/xml').send(twiml.toString());
+    }
     const g = gather(twiml, '/intake-firstname', { input: 'speech', speechTimeout: '3', timeout: 15 });
     sayLang(g, "I'd love to help! Could you please tell me your first and last name?", lang, callSid, '/intake-firstname');
     return res.type('text/xml').send(twiml.toString());
@@ -1450,7 +1495,17 @@ app.post('/intake-spell-name', (req, res) => {
     say(g, pick(RETRY_PROMPTS) + " Could you spell your first name for me, one letter at a time?");
     return res.type('text/xml').send(twiml.toString());
   }
-  const words = speech.toLowerCase().replace(/[^a-z ]/g, '').trim().split(/\s+/).filter(Boolean);
+  // NATO phonetic alphabet map — converts spoken phonetics to single letters
+  const NATO_MAP = {
+    alpha:'a', bravo:'b', charlie:'c', delta:'d', echo:'e', foxtrot:'f',
+    golf:'g', hotel:'h', india:'i', juliet:'j', kilo:'k', lima:'l',
+    mike:'m', november:'n', oscar:'o', papa:'p', quebec:'q', romeo:'r',
+    sierra:'s', tango:'t', uniform:'u', victor:'v', whiskey:'w',
+    xray:'x', 'x-ray':'x', yankee:'y', zulu:'z'
+  };
+  const rawWords = speech.toLowerCase().replace(/[^a-z\- ]/g, '').trim().split(/\s+/).filter(Boolean);
+  // Convert NATO phonetics to single letters before processing
+  const words = rawWords.map(w => NATO_MAP[w] !== undefined ? NATO_MAP[w] : w);
   const singleLetterCount = words.filter(w => w.length === 1).length;
   const isSpelled = words.length > 1 && (words.every(w => w.length === 1) || singleLetterCount >= words.length * 0.6);
   // If caller spelled a long sequence (>8 letters), they likely spelled both first AND last name
@@ -1478,7 +1533,32 @@ app.post('/intake-spell-name', (req, res) => {
         return res.type('text/xml').send(twiml.toString());
       }
     }
-    // Couldn't split — treat entire spelled sequence as first name only
+    // Couldn't split using spokenName — try heuristic: if joined > 8 chars, split at common first-name lengths
+    // Common first name lengths: 3-7 chars. Try splitting at each and pick one that makes two valid name-length parts.
+    if (joined.length > 8) {
+      let bestSplit = null;
+      for (let splitAt = 3; splitAt <= Math.min(7, joined.length - 3); splitAt++) {
+        const fRaw = joined.slice(0, splitAt);
+        const lRaw = joined.slice(splitAt);
+        if (fRaw.length >= 3 && lRaw.length >= 3) {
+          bestSplit = { fRaw, lRaw };
+          break;
+        }
+      }
+      if (bestSplit) {
+        firstName = bestSplit.fRaw.charAt(0).toUpperCase() + bestSplit.fRaw.slice(1).toLowerCase();
+        lastName = bestSplit.lRaw.charAt(0).toUpperCase() + bestSplit.lRaw.slice(1).toLowerCase();
+        sess.firstName = firstName;
+        sess.lastName = lastName;
+        sess._pendingFirstName = firstName;
+        sess._pendingLastName = lastName;
+        sess.pronouncedName = firstName;
+        const g2 = gather(twiml, '/intake-confirm-fullname', { input: 'speech', speechTimeout: '3', timeout: 12 });
+        say(g2, `I have your name as ${firstName} ${lastName} — is that correct?`);
+        return res.type('text/xml').send(twiml.toString());
+      }
+    }
+    // Final fallback — treat entire spelled sequence as first name only
     firstName = joined.charAt(0).toUpperCase() + joined.slice(1).toLowerCase();
     sess._pendingFirstName = firstName;
     const g = gather(twiml, '/intake-confirm-firstname', { input: 'speech', speechTimeout: '3', timeout: 12 });
@@ -4389,11 +4469,82 @@ app.post('/take-message-content', async (req, res) => {
     return res.type('text/xml').send(twiml.toString());
   }
   const callerName = sess.firstName ? `${sess.firstName} ${sess.lastName || ''}`.trim() : 'Caller';
-  await escalateToStaff(callerPhone, `💬 Message from ${callerName}`, `Caller: ${callerName}\nPhone: ${callerPhone}\nMessage: ${speech}`).catch(() => {});
-  sendCallSummaryToStaff(callerPhone, `Reason: Message taken\nCaller: ${callerName}\nMessage: ${speech}\nOutcome: Staff notified by text`).catch(() => {});
+  sess._pendingMessage = speech;
+  sess._pendingMessageCaller = callerName;
+  // If we don't have an email for this caller yet, capture it before closing — every caller is a potential lead
+  if (!sess.email && !sess.emailOnFile) {
+    sess._messageAlreadySent = false;
+    const g = gather(twiml, '/take-message-email', { input: 'speech', speechTimeout: '4', timeout: 15 });
+    say(g, "Got it! I've noted your message. Before I let you go, what's the best email address for you? That way our team can follow up by email as well.");
+    return res.type('text/xml').send(twiml.toString());
+  }
+  // Email already on file — send summary immediately
+  await escalateToStaff(callerPhone, `💬 Message from ${callerName}`, `Caller: ${callerName}\nPhone: ${callerPhone}\nEmail: ${sess.email || sess.emailOnFile || 'N/A'}\nMessage: ${speech}`).catch(() => {});
+  sendCallSummaryToStaff(callerPhone, `Reason: Message taken\nCaller: ${callerName}\nMessage: ${speech}\nOutcome: Staff notified by text`, callSid).catch(() => {});
   say(twiml, "Perfect! I've sent your message to our team right now and they'll follow up with you shortly. Is there anything else I can help you with today?");
   const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: '3', timeout: 10 });
   say(g, "");
+  twiml.hangup();
+  res.type('text/xml').send(twiml.toString());
+});
+
+// ─── Lead email capture after message ────────────────────────────────────────
+app.post('/take-message-email', async (req, res) => {
+  const speech = (req.body.SpeechResult || '').trim();
+  const callerPhone = req.body.From || 'anonymous';
+  const callSid = req.body.CallSid;
+  const twiml = new VoiceResponse();
+  const sess = getSession(callSid);
+  const callerName = sess._pendingMessageCaller || (sess.firstName ? `${sess.firstName} ${sess.lastName || ''}`.trim() : 'Caller');
+  const message = sess._pendingMessage || '[message not captured]';
+
+  // Try to parse email from speech
+  const emailMatch = speech.replace(/\s+at\s+/gi, '@').replace(/\s+dot\s+/gi, '.').replace(/\s/g, '').match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
+  if (emailMatch) {
+    sess.email = emailMatch[0].toLowerCase();
+  } else if (speech.length > 2 && !/^(no|nope|skip|pass|don.?t|none|n.?a|not|i don|i don't)$/i.test(speech)) {
+    // Couldn't parse as email but caller said something — store as-is and ask to confirm
+    const g = gather(twiml, '/take-message-email-confirm', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    say(g, `I have your email as ${speech} — is that correct?`);
+    sess._pendingEmail = speech;
+    return res.type('text/xml').send(twiml.toString());
+  }
+
+  // Send the staff notification now
+  const emailStr = sess.email || 'not provided';
+  await escalateToStaff(callerPhone, `💬 Message from ${callerName}`, `Caller: ${callerName}\nPhone: ${callerPhone}\nEmail: ${emailStr}\nMessage: ${message}`).catch(() => {});
+  sendCallSummaryToStaff(callerPhone, `Reason: Message taken\nCaller: ${callerName}\nMessage: ${message}\nEmail: ${emailStr}\nOutcome: Staff notified`, callSid).catch(() => {});
+  say(twiml, "Perfect! I've sent your message and contact info to our team. They'll be in touch soon. Is there anything else I can help you with today?");
+  const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: '3', timeout: 10 });
+  say(g, '');
+  twiml.hangup();
+  res.type('text/xml').send(twiml.toString());
+});
+
+app.post('/take-message-email-confirm', async (req, res) => {
+  const speech = (req.body.SpeechResult || '').toLowerCase().trim();
+  const callerPhone = req.body.From || 'anonymous';
+  const callSid = req.body.CallSid;
+  const twiml = new VoiceResponse();
+  const sess = getSession(callSid);
+  const callerName = sess._pendingMessageCaller || (sess.firstName ? `${sess.firstName} ${sess.lastName || ''}`.trim() : 'Caller');
+  const message = sess._pendingMessage || '[message not captured]';
+  const confirmed = /yes|correct|right|good|that.?s right|yep|yeah|uh.?huh/.test(speech);
+  if (confirmed && sess._pendingEmail) {
+    sess.email = sess._pendingEmail.toLowerCase();
+    delete sess._pendingEmail;
+  } else if (!confirmed) {
+    // Re-ask
+    const g = gather(twiml, '/take-message-email', { input: 'speech', speechTimeout: '4', timeout: 15 });
+    say(g, "No problem! Could you give me your email address again?");
+    return res.type('text/xml').send(twiml.toString());
+  }
+  const emailStr = sess.email || 'not provided';
+  await escalateToStaff(callerPhone, `💬 Message from ${callerName}`, `Caller: ${callerName}\nPhone: ${callerPhone}\nEmail: ${emailStr}\nMessage: ${message}`).catch(() => {});
+  sendCallSummaryToStaff(callerPhone, `Reason: Message taken\nCaller: ${callerName}\nMessage: ${message}\nEmail: ${emailStr}\nOutcome: Staff notified`, callSid).catch(() => {});
+  say(twiml, "Perfect! I've sent your message and contact info to our team. They'll be in touch soon. Is there anything else I can help you with today?");
+  const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: '3', timeout: 10 });
+  say(g, '');
   twiml.hangup();
   res.type('text/xml').send(twiml.toString());
 });
