@@ -1,5 +1,5 @@
 /**
- * Taylor Medical Group — AI Phone Receptionist v7.39 "Tay"
+ * Taylor Medical Group — TMG Phone Receptionist v7.39 "Tay"
  * Twilio: +1 (404) 736-6917  |  Office: 678-443-4000
  * v6.0 changes: email summaries (Resend API), voicemail capture, enhanced knowledge base
  */
@@ -5634,7 +5634,7 @@ async function selfPing() {
         console.log('[WATCHDOG] Self-ping recovered after', _pingFailures, 'failures');
         const recoveryHtml = `<div style="font-family:Arial,sans-serif;padding:24px;">
           <h2 style="color:#276749;">✅ Tay — Service Recovered</h2>
-          <p>Taylor's AI receptionist is back online after a period of failed health checks.</p>
+          <p>TMG Phone Receptionist (Tay) is back online after a period of failed health checks.</p>
           <table style="width:100%;border-collapse:collapse;margin:16px 0;">
             <tr><td style="padding:8px;font-weight:bold;">Recovery Time:</td><td style="padding:8px;">${new Date().toLocaleString('en-US',{timeZone:'America/New_York'})}</td></tr>
             <tr style="background:#f7fafc;"><td style="padding:8px;font-weight:bold;">Downtime Duration:</td><td style="padding:8px;">~${Math.round((Date.now()-_lastPingSuccess)/60000)} minutes</td></tr>
@@ -5642,7 +5642,7 @@ async function selfPing() {
           </table>
           <p style="color:#276749;">Taylor is now accepting calls normally.</p>
         </div>`;
-        await sendEmail('✅ Tay — Service Recovered', recoveryHtml, `Taylor AI receptionist has recovered. Was down ~${Math.round((Date.now()-_lastPingSuccess)/60000)} minutes.`).catch(()=>{});
+        await sendEmail('✅ Tay — Service Recovered', recoveryHtml, `TMG Phone Receptionist (Tay) has recovered. Was down ~${Math.round((Date.now()-_lastPingSuccess)/60000)} minutes.`).catch(()=>{});
         _downtimeAlertSent = false;
       }
       _pingFailures = 0;
@@ -5657,8 +5657,8 @@ async function selfPing() {
       _downtimeAlertSent = true;
       console.error('[WATCHDOG] 3 consecutive failures — sending downtime alert to staff');
       const downtimeHtml = `<div style="font-family:Arial,sans-serif;padding:24px;">
-        <h2 style="color:#c53030;">🚨 URGENT: Tay (AI Receptionist) May Be Down</h2>
-        <p>Taylor's AI receptionist has failed <strong>3 consecutive health checks</strong> and may not be answering calls.</p>
+        <h2 style="color:#c53030;">🚨 URGENT: Tay (TMG Phone Receptionist) May Be Down</h2>
+        <p>TMG Phone Receptionist (Tay) has failed <strong>3 consecutive health checks</strong> and may not be answering calls.</p>
         <table style="width:100%;border-collapse:collapse;margin:16px 0;">
           <tr><td style="padding:8px;font-weight:bold;">Alert Time:</td><td style="padding:8px;">${new Date().toLocaleString('en-US',{timeZone:'America/New_York'})}</td></tr>
           <tr style="background:#fff5f5;"><td style="padding:8px;font-weight:bold;">Last Successful Ping:</td><td style="padding:8px;">${new Date(_lastPingSuccess).toLocaleString('en-US',{timeZone:'America/New_York'})}</td></tr>
@@ -5670,7 +5670,7 @@ async function selfPing() {
         <p><a href="https://railway.com/project/4cf8df8f-53ec-4537-aba2-c47e99799c69/service/fd56ee17-7e7e-4812-8769-6478027fc050" style="color:#2b6cb0;">Open Railway Dashboard → tmg-ai-receptionist</a></p>
         <p style="color:#718096;font-size:12px;">This alert was sent by the watchdog running inside the service itself. If Railway restarted the service, a recovery email will follow.</p>
       </div>`;
-      await sendEmail('🚨 URGENT: Tay AI Receptionist May Be Down', downtimeHtml, `URGENT: Taylor AI receptionist failed 3 health checks. Calls may be going unanswered. Check Railway immediately.`).catch(()=>{});
+      await sendEmail('🚨 URGENT: Tay — TMG Phone Receptionist May Be Down', downtimeHtml, `URGENT: TMG Phone Receptionist (Tay) failed 3 health checks. Calls may be going unanswered. Check Railway immediately.`).catch(()=>{});
     }
   }
 }
@@ -5687,8 +5687,8 @@ function startWatchdog() {
 
 async function sendStartupAlert() {
   const html = `<div style="font-family:Arial,sans-serif;padding:24px;">
-    <h2 style="color:#2c5282;">✅ Tay — AI Receptionist Online</h2>
-    <p>Taylor's AI receptionist has started successfully and is now accepting calls.</p>
+    <h2 style="color:#2c5282;">✅ Tay — TMG Phone Receptionist Online</h2>
+    <p>TMG Phone Receptionist (Tay) has started successfully and is now accepting calls.</p>
     <table style="width:100%;border-collapse:collapse;margin:16px 0;">
       <tr><td style="padding:8px;font-weight:bold;">Start Time:</td><td style="padding:8px;">${new Date().toLocaleString('en-US',{timeZone:'America/New_York'})}</td></tr>
       <tr style="background:#f7fafc;"><td style="padding:8px;font-weight:bold;">Version:</td><td style="padding:8px;">v7.39</td></tr>
@@ -5698,7 +5698,7 @@ async function sendStartupAlert() {
     </table>
     <p style="color:#276749;">All systems operational. Smoke tests will run in 45 seconds.</p>
   </div>`;
-  await sendEmail('✅ Tay — AI Receptionist Started', html, 'Taylor AI receptionist started successfully and is now accepting calls.').catch(()=>{});
+  await sendEmail('✅ Tay — TMG Phone Receptionist Started', html, 'TMG Phone Receptionist (Tay) started successfully and is now accepting calls.').catch(()=>{});
 }
 
 app.listen(PORT, () => {
