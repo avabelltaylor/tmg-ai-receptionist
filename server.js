@@ -1368,17 +1368,43 @@ app.post('/intake-firstname', (req, res) => {
   const callSid = req.body.CallSid;
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
+
+  // ── Language detection: runs once on first real caller utterance ──────────
+  // Only switches if the caller actually speaks another language — never based on accent
+  if (!sess.lang) {
+    sess.lang = detectLanguage(speech);
+    if (sess.lang !== 'en') {
+      const LANG_ACKS = {
+        es:  '¡Hola! Con mucho gusto. ¿Puede decirme su nombre completo, por favor?',
+        fr:  'Bonjour ! Avec plaisir. Pouvez-vous me donner votre nom complet, s\'il vous plaît ?',
+        pt:  'Olá! Com prazer. Pode me dizer o seu nome completo, por favor?',
+        ar:  'مرحباً! بكل سرور. هل يمكنك إخباري باسمك الكامل من فضلك؟',
+        zh:  '您好！很高兴为您服务。请告诉我您的全名好吗？',
+        yue: '你好！很高興為您服務。請告訴我您的全名好嗎？',
+        ru:  'Здравствуйте! С удовольствием помогу. Скажите, пожалуйста, ваше полное имя?',
+        tl:  'Kumusta! Ikinalulugod kong tulungan kayo. Maaari po bang sabihin ang inyong buong pangalan?',
+      };
+      const ack = LANG_ACKS[sess.lang];
+      if (ack) {
+        const g = gather(twiml, '/intake-firstname', { input: 'speech', speechTimeout: '3', timeout: 15 });
+        sayLang(g, ack, sess.lang, callSid, '/intake-firstname');
+        return res.type('text/xml').send(twiml.toString());
+      }
+    }
+  }
+  const lang = sess.lang || 'en';
+
   // Filter out filler phrases that are not names
   const FILLER_PHRASES = /^(hi|hello|hey|hi there|hello there|good morning|good afternoon|good evening|thank you|thanks|sure|okay|ok|yes|yeah|yep|uh huh|um|uh|hmm|oh|oh hi|oh hello|oh okay|oh sure)([.!?,]?\s*.*)?$/i;
   if (!speech || speech.length < 2 || FILLER_PHRASES.test(speech.trim())) {
     const g = gather(twiml, '/intake-firstname', { input: 'speech', speechTimeout: '3', timeout: 15 });
-    say(g, "I'd love to help! Could you please tell me your first and last name?");
+    sayLang(g, "I'd love to help! Could you please tell me your first and last name?", lang, callSid, '/intake-firstname');
     return res.type('text/xml').send(twiml.toString());
   }
-  // Strip filler words and clean up
+  // Strip filler words and clean up (English filler only — non-Latin scripts pass through)
   const cleaned = speech
     .replace(/\b(my name is|i am|this is|it's|its|um|uh|hmm|like|so|well)\b/gi, '')
-    .replace(/[^a-zA-Z '-]/g, '')
+    .replace(/[^a-zA-Z\u00C0-\u024F\u0400-\u04FF\u0600-\u06FF\u4E00-\u9FFF\u3400-\u4DBF '-]/g, '')
     .trim();
   const words = cleaned.split(/\s+/).filter(Boolean);
   // If caller gave both first and last name (2+ real words, each 2+ letters), split immediately
@@ -1395,7 +1421,7 @@ app.post('/intake-firstname', (req, res) => {
     // Confirm the full name directly — skip spelling loop
     const fullName = `${firstName} ${lastName}`;
     const g = gather(twiml, '/intake-confirm-fullname', { input: 'speech', speechTimeout: '3', timeout: 12 });
-    say(g, `Nice to meet you! I have your name as ${fullName} — is that correct?`);
+    sayLang(g, `Nice to meet you! I have your name as ${fullName} — is that correct?`, lang, callSid, '/intake-firstname');
     return res.type('text/xml').send(twiml.toString());
   }
   // Single word — ask for last name directly
@@ -1403,12 +1429,12 @@ app.post('/intake-firstname', (req, res) => {
     const firstName = realWords[0].charAt(0).toUpperCase() + realWords[0].slice(1).toLowerCase();
     sess._pendingFirstName = firstName;
     const g = gather(twiml, '/intake-spell-lastname', { input: 'speech', speechTimeout: '3', timeout: 15 });
-    say(g, `Thank you! And could you spell your last name for me, one letter at a time?`);
+    sayLang(g, `Thank you! And could you spell your last name for me, one letter at a time?`, lang, callSid, '/intake-firstname');
     return res.type('text/xml').send(twiml.toString());
   }
   // Fallback — couldn't parse, ask again
   const g = gather(twiml, '/intake-firstname', { input: 'speech', speechTimeout: '3', timeout: 15 });
-  say(g, "I'd love to help! Could you please tell me your first and last name?");
+  sayLang(g, "I'd love to help! Could you please tell me your first and last name?", lang, callSid, '/intake-firstname');
   res.type('text/xml').send(twiml.toString());
 });
 
