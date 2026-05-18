@@ -116,7 +116,7 @@ const CONFIG = {
     username: process.env.RC_USERNAME || '6784434000',
     password: process.env.RC_PASSWORD,
     extension: process.env.RC_EXTENSION || '101',
-    fromNumber: process.env.RC_FROM_NUMBER || '+16784434000',
+    fromNumber: process.env.RC_FROM_NUMBER || '+14705141913',
     server: 'https://platform.ringcentral.com',
   },
   intakeq: {
@@ -1922,7 +1922,7 @@ app.post('/main-intent', (req, res) => {
     twiml.redirect('/refill-start');
   } else if (intent === 'labs' || intent === 'portal') {
     say(twiml, "Of course! Great news — you can check your lab results, view your prescriptions, request refills, and message our team any time through the patient portal. I'm texting you the link right now!");
-    sendSms(callerPhone, `Taylor Medical Group — Patient Portal:\n${CONFIG.intakeq.portalUrl}\n\nView lab results, prescriptions, request refills, and message our team 24/7.`).catch(() => {});
+    sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nPatient Portal (labs, prescriptions, messages):\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\nQuestions? Call 678-443-4000`).catch(() => {});
     sendCallSummaryToStaff(callerPhone, `Reason: Lab results / portal access\nOutcome: Portal link sent`).catch(() => {});
     const g = gather(twiml, '/main-intent', { timeout: 8 });
     say(g, "Is there anything else I can do for you today?");
@@ -1931,7 +1931,7 @@ app.post('/main-intent', (req, res) => {
     twiml.redirect('/directions-info');
   } else if (intent === 'hours') {
     say(twiml, "Great question! Our phones are available Monday through Friday, 9 AM to 5 PM Eastern. We see patients in the office on Mondays, Thursdays, and Fridays from 10 AM to 5 PM — and Fridays we wrap up at 3. You can also book online any time — I'm sending you the link right now!");
-    sendSms(callerPhone, `Taylor Medical Group — Book an Appointment:\n${CONFIG.intakeq.bookingUrl}\n\nPatient appointments: Mon, Thu & Fri, 10am–5pm ET (Fri closes 3pm)\nOffice admin: Mon–Fri, 9am–5pm`).catch(() => {});
+    sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nBook an appointment online 24/7:\n${CONFIG.intakeq.bookingUrl}\n\nPatient hours: Mon, Thu & Fri 10am–5pm ET (Fri closes 3pm)\nAdmin: Mon–Fri 9am–5pm\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\nQuestions? Call 678-443-4000`).catch(() => {});
     const g = gather(twiml, '/main-intent', { timeout: 8 });
     say(g, "Is there anything else I can do for you today?");
     twiml.hangup();
@@ -1939,7 +1939,7 @@ app.post('/main-intent', (req, res) => {
     twiml.redirect('/telehealth-info');
   } else if (intent === 'children') {
     say(twiml, "Yes, we do see children as long as they are cooperative. I'd be happy to get them scheduled! Are you calling to book a new patient visit for your child?");
-    sendSms(callerPhone, `Taylor Medical Group — Book an Appointment:\n${CONFIG.intakeq.bookingUrl}\n\nWe see children as long as they are cooperative. Book online 24/7 or call 678-443-4000.`).catch(() => {});
+    sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nBook an appointment online 24/7:\n${CONFIG.intakeq.bookingUrl}\n\nWe see children as long as they are cooperative.\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\nQuestions? Call 678-443-4000`).catch(() => {});
     const g = gather(twiml, '/appt-patient-type', { timeout: 10 });
     say(g, "Would you like to schedule an appointment?");
   } else if (intent === 'iv') {
@@ -1997,7 +1997,7 @@ app.post('/unknown-choice', (req, res) => {
     twiml.redirect('/leave-message');
   } else {
     say(twiml, "Absolutely! I want to make sure you get the right help, so I'm sending you the patient portal link right now. You can message the doctors directly there and they will personally get back to you. You're in great hands!");
-    sendSms(callerPhone, `Taylor Medical Group — Message our doctors:\n${CONFIG.intakeq.portalUrl}\n\nOr visit: www.taylormedicalgroup.net`).catch(() => {});
+    sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nMessage our doctors directly through the patient portal:\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\nQuestions? Call 678-443-4000`).catch(() => {});
     sendCallSummaryToStaff(callerPhone, `Reason: Unknown question — portal link sent`).catch(() => {});
     const g = gather(twiml, '/main-intent', { timeout: 8 });
     say(g, "Is there anything else I can do for you today?");
@@ -2441,7 +2441,7 @@ app.post('/refill-check-pin', async (req, res) => {
       await storePinForClient(sess.refillClientId, newPin, client.AdditionalInformation);
       say(twiml, `I've created a security PIN for you and I'm sending it to you by both text and email right now. Please save it — you'll use it for all future calls to verify your identity. Once you receive it, please tell me the PIN to continue.`);
       const smsTarget = sess.callerPhone;
-      await sendSms(smsTarget, `Taylor Medical Group — Your Security PIN\n\nYour PIN is: ${newPin}\n\nPlease save this for future calls to verify your identity.\n\nPatient portal: ${CONFIG.intakeq.portalUrl}`);
+      await sendSms(smsTarget, `TMG Phone Receptionist — Taylor Medical Group\n\nYour Security PIN: ${newPin}\n\nSave this for future calls to verify your identity.\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\nBook an appointment: ${CONFIG.intakeq.bookingUrl}`);
       const g = gather(twiml, '/refill-pin-verify', { input: 'speech dtmf', speechTimeout: '3', timeout: 30 });
       say(g, "Go ahead and say or enter your PIN whenever you're ready.");
     }
@@ -2612,7 +2612,7 @@ app.post('/refill-process', async (req, res) => {
 
   if (isThyroid) {
     say(twiml, `For thyroid medications, our doctors require a current blood test through LabCorp before issuing a refill. This ensures your dosage is still right for you. I'm sending you the patient portal link right now — please message the doctors there and they'll send you the LabCorp order. Once your results are in, the doctors will issue a 30-day refill.`);
-    sendSms(sess.callerPhone, `Taylor Medical Group — Thyroid Refill\n\nA current LabCorp blood test is required for thyroid medication refills.\n\nMessage our doctors through the portal to request your lab order:\n${CONFIG.intakeq.portalUrl}`).catch(() => {});
+    sendSms(sess.callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nThyroid Refill: A current LabCorp blood test is required.\n\nMessage our doctors to request your lab order:\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\nQuestions? Call 678-443-4000`).catch(() => {});
     escalateToStaff(sess.callerPhone, 'Thyroid refill — LabCorp order needed', `Patient: ${sess.refillClientName} | Medication: ${speech}`).catch(() => {});
     sendCallSummaryToStaff(sess.callerPhone, `Reason: Thyroid refill\nPatient: ${sess.refillClientName}\nMedication: ${speech}\nOutcome: Portal link sent, staff alerted for LabCorp order`).catch(() => {});
   } else {
@@ -2622,7 +2622,7 @@ app.post('/refill-process', async (req, res) => {
       const monthsAgo = lastAppt ? (now - lastAppt) / (1000 * 60 * 60 * 24 * 30) : 999;
       if (monthsAgo <= 6) {
         say(twiml, `Great news! Since you were seen within the past 6 months, I can submit your refill request right now. I'm sending you the patient portal link — you can also view all your prescriptions and submit refill requests directly through the portal anytime.`);
-        sendSms(sess.callerPhone, `Taylor Medical Group — Prescription Refill\n\nYour refill request for ${speech} has been noted.\n\nView your prescriptions and submit refill requests through your patient portal:\n${CONFIG.intakeq.portalUrl}\n\nAllow up to 10 business days for processing.`).catch(() => {});
+        sendSms(sess.callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nYour refill request for ${speech} has been noted.\n\nView prescriptions & submit requests:\n${CONFIG.intakeq.portalUrl}\n\nAllow up to 10 business days for processing.\n\nQuestions? Call 678-443-4000`).catch(() => {});
         escalateToStaff(sess.callerPhone, 'Prescription refill request', `Patient: ${sess.refillClientName} (ID: ${sess.refillClientNumber}) | Medication: ${speech} | Last visit: ${lastAppt ? lastAppt.toLocaleDateString() : 'unknown'}`).catch(() => {});
         sendCallSummaryToStaff(sess.callerPhone, `Reason: Prescription refill\nPatient: ${sess.refillClientName}\nMedication: ${speech}\nLast visit: ${lastAppt ? lastAppt.toLocaleDateString() : 'unknown'}\nOutcome: Refill submitted, portal link sent`).catch(() => {});
       } else {
@@ -2635,7 +2635,7 @@ app.post('/refill-process', async (req, res) => {
     } catch (err) {
       console.error('[REFILL PROCESS]', err.message);
       say(twiml, "I'm having a little trouble checking your records right now. Let me send you the patient portal link where you can submit your refill request directly.");
-      sendSms(sess.callerPhone, `Taylor Medical Group — Patient Portal:\n${CONFIG.intakeq.portalUrl}\n\nSubmit your refill request and view your prescriptions 24/7.`).catch(() => {});
+      sendSms(sess.callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nPatient Portal (submit refills, view prescriptions):\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\nQuestions? Call 678-443-4000`).catch(() => {});
     }
   }
   const g = gather(twiml, '/main-intent', { timeout: 8 }); say(g, "Is there anything else I can help you with today?"); twiml.hangup();
@@ -2654,13 +2654,13 @@ app.post('/refill-bridge-choice', (req, res) => {
     twiml.redirect('/appt-service-type-established');
   } else if (/hormone test|test kit|saliva|kit/.test(speech)) {
     say(twiml, "Great choice! I'm sending you the hormone test kit information right now. Once you order and complete the test, our doctors will review the results and issue your 30-day bridge refill.");
-    sendSms(sess.callerPhone, `Taylor Medical Group — Hormone Test Kit\n\nOrder your saliva hormone test kit:\nBasic (3 hormones): $150\nComprehensive: $299\n\nBook: ${CONFIG.intakeq.bookingUrl}\nVideo: ${CONFIG.practice.youtubeHormone}\n\nOnce your results are in, the doctors will issue a 30-day bridge refill.`).catch(() => {});
+    sendSms(sess.callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nHormone Test Kit:\nBasic (3 hormones): $150\nComprehensive: $299\n\nBook: ${CONFIG.intakeq.bookingUrl}\nHormone video: ${CONFIG.practice.youtubeHormone}\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\nOnce your results are in, the doctors will issue a 30-day bridge refill.`).catch(() => {});
     escalateToStaff(sess.callerPhone, 'Bridge refill — hormone test path', `Patient: ${sess.refillClientName} | Medication: ${sess.refillMedication} | Action: Order hormone test + issue 30-day bridge refill`).catch(() => {});
     sendCallSummaryToStaff(sess.callerPhone, `Reason: Bridge refill — hormone test path\nPatient: ${sess.refillClientName}\nMedication: ${sess.refillMedication}\nOutcome: Test kit info sent, staff alerted`).catch(() => {});
     const g = gather(twiml, '/main-intent', { timeout: 8 }); say(g, "Is there anything else I can help you with today?"); twiml.hangup();
   } else {
     say(twiml, "I completely understand. The best way to get a message directly to the doctors is through the patient portal. I'm sending you the link right now — you can explain your situation there and the doctors will respond personally.");
-    sendSms(sess.callerPhone, `Taylor Medical Group — Message our doctors:\n${CONFIG.intakeq.portalUrl}`).catch(() => {});
+    sendSms(sess.callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nMessage our doctors:\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\nQuestions? Call 678-443-4000`).catch(() => {});
     escalateToStaff(sess.callerPhone, 'Refill — patient dissatisfied with bridge policy', `Patient: ${sess.refillClientName} | Medication: ${sess.refillMedication}`).catch(() => {});
     sendCallSummaryToStaff(sess.callerPhone, `Reason: Refill bridge — patient declined options\nPatient: ${sess.refillClientName}\nMedication: ${sess.refillMedication}\nOutcome: Portal link sent, staff alerted`).catch(() => {});
     const g = gather(twiml, '/main-intent', { timeout: 8 }); say(g, "Is there anything else I can help you with today?"); twiml.hangup();
@@ -3704,8 +3704,8 @@ app.post('/appt-send-pin', async (req, res) => {
     const smsTarget = sess.collectedPhone || sess.callerPhone;
     const isNew = !existingPin;
     const pinMsg = isNew
-      ? `Taylor Medical Group — Your Security PIN\n\nYour new PIN is: ${pin}\n\nPlease save this — you'll use it every time you call to verify your identity.\n\nPatient portal: ${CONFIG.intakeq.portalUrl}`
-      : `Taylor Medical Group — Your Security PIN\n\nYour PIN is: ${pin}\n\nUse this to verify your identity on future calls.\n\nPatient portal: ${CONFIG.intakeq.portalUrl}`;
+      ? `TMG Phone Receptionist — Taylor Medical Group\n\nYour Security PIN: ${pin}\n\nSave this — you'll use it every time you call to verify your identity.\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\nBook an appointment: ${CONFIG.intakeq.bookingUrl}`
+      : `TMG Phone Receptionist — Taylor Medical Group\n\nYour Security PIN: ${pin}\n\nUse this to verify your identity on future calls.\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\nBook an appointment: ${CONFIG.intakeq.bookingUrl}`;
     await sendSms(smsTarget, pinMsg).catch(() => {});
 
     // Also email the PIN to the patient's email on file (SMS fallback during A2P pending)
@@ -4130,7 +4130,7 @@ app.post('/appt-save-visit-reason', (req, res) => {
   // If new patient mentions detailed info, offer portal
   const wantsPortal = /detail|message|explain|lot to say|complicated|complex|long story|lot of|send.*link|portal/.test(speech.toLowerCase());
   if (isNew && wantsPortal) {
-    sendSms(sess.callerPhone, `Taylor Medical Group — Message our doctors directly:\n${CONFIG.intakeq.portalUrl}\n\nLog in and send a message to the doctors before your appointment so they can prepare.`).catch(() => {});
+    sendSms(sess.callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nMessage our doctors before your appointment so they can prepare:\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\nQuestions? Call 678-443-4000`).catch(() => {});
     say(twiml, `Absolutely! I’ve just sent you the patient portal link. You can log in and send the doctors a detailed message before your appointment so they’re fully prepared. Let me go ahead and pull up our available times for you now.`);
   } else {
     say(twiml, `Got it — I’ve noted that. Let me pull up our available times for you.`);
@@ -4170,7 +4170,7 @@ app.post('/appt-find-slots', async (req, res) => {
   } catch (err) {
     console.error('[SLOTS]', err.message);
     say(twiml, "I'm having a little trouble with our scheduling system right now. Please visit Taylor Medical Group dot net and click Patient Portal in the top right corner to book online.");
-    sendSms(sess.callerPhone, `Taylor Medical Group — Book an Appointment:\n${CONFIG.intakeq.bookingUrl}`).catch(() => {});
+    sendSms(sess.callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nBook an appointment online 24/7:\n${CONFIG.intakeq.bookingUrl}\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\nQuestions? Call 678-443-4000`).catch(() => {});
     twiml.hangup();
     return res.type('text/xml').send(twiml.toString());
   }
@@ -4216,7 +4216,7 @@ app.post('/appt-sooner-date', async (req, res) => {
   const sess = getSession(callSid);
   const preferredTime = speech || 'as soon as possible';
   await escalateToStaff(sess.callerPhone, 'Patient requesting earlier appointment', `Patient: ${sess.firstName || ''} ${sess.lastName || ''} | Service: ${sess.serviceName || ''} | Preferred: ${preferredTime}`).catch(() => {});
-  await sendSms(sess.callerPhone, `Taylor Medical Group — Earlier Appointment Request\n\nYour request for ${preferredTime} has been sent to our office.\n\nThe team will reach out through the patient portal:\n${CONFIG.intakeq.portalUrl}\n\nPlease log in so we can confirm your appointment.\n\nQuestions? Call 678-443-4000`).catch(() => {});
+  await sendSms(sess.callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nEarlier Appointment Request: Your request for ${preferredTime} has been sent to our office.\n\nThe team will reach out through the patient portal:\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\nQuestions? Call 678-443-4000`).catch(() => {});
   say(twiml, `Perfect! I've sent your request for ${preferredTime} to our office right now. The team will reach out to you through the patient portal with your appointment options. Please visit Taylor Medical Group dot net and click Patient Portal in the top right corner to log in so our team can reach you.`);
   sendCallSummaryToStaff(sess.callerPhone, `Reason: Earlier appointment request\nPatient: ${sess.firstName || ''} ${sess.lastName || ''}\nService: ${sess.serviceName || ''}\nPreferred: ${preferredTime}`).catch(() => {});
   const g = gather(twiml, '/main-intent', { timeout: 8 }); say(g, "Is there anything else I can do for you today?"); twiml.hangup();
@@ -4252,7 +4252,7 @@ app.post('/appt-confirm-booking', async (req, res) => {
     const isAnnual = /annual|yearly|wellness/i.test(sess.serviceName || '') || sess.serviceId === CONFIG.services.establishedAnnual30;
     const requiresForms = isNewPatient || isAnnual || isTelehealth;
 
-    let confirmSms = `✅ Taylor Medical Group — Appointment Confirmed!\n\nPatient: ${sess.firstName} ${sess.lastName}\nService: ${sess.serviceName}\nDate: ${sess.selectedSlot.label}\n\n`;
+    let confirmSms = `✅ TMG Phone Receptionist — Appointment Confirmed!\n\nPatient: ${sess.firstName} ${sess.lastName}\nService: ${sess.serviceName}\nDate: ${sess.selectedSlot.label}\n\n`;
     if (!isTelehealth) {
       confirmSms += `📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n🅿️ Park in the Building C deck, take elevator to level T (tunnel). First suite on your left.\n\n`;
     }
@@ -4380,7 +4380,7 @@ app.post('/records-info', (req, res) => {
   const callerPhone = req.body.From || 'anonymous';
   const twiml = new VoiceResponse();
   say(twiml, "Medical records are released according to our office policies. Please note that lab results are provided at the time of your appointment — requests outside of appointment times become a formal medical records request and fees do apply. You can submit your medical records request through the patient portal at Taylor Medical Group dot net — click Patient Portal in the top right corner.");
-  sendSms(callerPhone, `Taylor Medical Group — Medical Records Request\n\nSubmit your medical records request through the patient portal:\n${CONFIG.intakeq.portalUrl}\n\nPlease refer to your signed office policy for instructions. Fees apply for records requested outside of appointments.`).catch(() => {});
+  sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nMedical Records Request: Submit through the patient portal:\n${CONFIG.intakeq.portalUrl}\n\nFees apply for records requested outside of appointments. See your signed office policy for details.\n\nQuestions? Call 678-443-4000`).catch(() => {});
   sendCallSummaryToStaff(callerPhone, `Reason: Medical records request\nOutcome: Portal link sent`).catch(() => {});
   const g = gather(twiml, '/main-intent', { timeout: 8 }); say(g, "Is there anything else I can help you with today?"); twiml.hangup();
   res.type('text/xml').send(twiml.toString());
@@ -4541,7 +4541,7 @@ app.post('/transfer-info', (req, res) => {
   sess.callerPhone = callerPhone;
   // Per Dr. Taylor's protocol: all direct patient-to-doctor communication goes through the patient portal
   say(twiml, "I completely understand, and I want to make sure you get the best help possible. Our doctors have asked that all direct patient communication go through our secure patient portal — that way they can respond to you personally. I'm sending you the portal link right now by text!");
-  sendSms(callerPhone, `Taylor Medical Group — Patient Portal:\n${CONFIG.intakeq.portalUrl}\n\nOur doctors have asked that all patient communication go through the portal. Log in to message the doctors directly, view your appointments, prescriptions, and lab results.\n\nCall 678-443-4000 with questions.`).catch(() => {});
+  sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nPatient Portal (appointments, prescriptions, lab results, messages):\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\nQuestions? Call 678-443-4000`).catch(() => {});
   const g = gather(twiml, '/take-message-content', { input: 'speech', speechTimeout: '3', timeout: 20 });
   say(g, "Is there anything else I can help you with today, or would you also like to leave a message for our team?");
   res.type('text/xml').send(twiml.toString());
@@ -4646,7 +4646,7 @@ app.post('/telehealth-info', (req, res) => {
   const callerPhone = req.body.From || 'anonymous';
   const twiml = new VoiceResponse();
   say(twiml, "Yes, we offer telehealth and virtual appointments for your convenience! You can book a telehealth visit online 24 hours a day, 7 days a week. Telehealth visits are available for both new and established patients. Please visit Taylor Medical Group dot net and click Patient Portal in the top right corner to book online.");
-  sendSms(callerPhone, `Taylor Medical Group — Telehealth Appointments\n\nBook a virtual visit online 24/7:\n${CONFIG.intakeq.bookingUrl}\n\nCurrent pricing is listed on our booking page.\n\nHSA/FSA accepted. Questions? Call 678-443-4000`).catch(() => {});
+  sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nTelehealth Appointments — Book a virtual visit 24/7:\n${CONFIG.intakeq.bookingUrl}\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\nHSA/FSA accepted. Questions? Call 678-443-4000`).catch(() => {});
   sendCallSummaryToStaff(callerPhone, `Reason: Telehealth inquiry\nOutcome: Booking link sent`).catch(() => {});
   const g = gather(twiml, '/appt-patient-type', { timeout: 10 });
   say(g, "Would you like to go ahead and schedule a telehealth visit? Are you a new patient, or an existing patient?");
@@ -4679,7 +4679,7 @@ app.post('/iv-info', (req, res) => {
     ivDetail = 'Yes, we offer ketamine IV therapy. ';
   }
   say(twiml, `${ivDetail}Unlike many other clinics, our doctors personally administer all IV treatments. All patients must first be evaluated by one of our doctors prior to receiving IV therapy — this can often be done on the same day as your first treatment. The doctor will review your medical history and recommend the IV that is right for you. Please visit Taylor Medical Group dot net and click Patient Portal in the top right corner to book your IV therapy appointment.`);
-  sendSms(callerPhone, `Taylor Medical Group — IV Therapy\n\nOur doctors personally administer all IV treatments. An IV evaluation consult is required prior to treatment (can be same day).\n\nIV options include: Myers Cocktail, NAD+, Vitamin C, Glutathione, Iron Infusion, Chelation (EDTA/DMSO/DTPA), Hydrogen Peroxide, Ozone, Ketamine, and more.\n\nBook your IV consult:\n${CONFIG.intakeq.bookingUrl}\n\nPricing: www.taylormedicalgroup.net/pricing`).catch(() => {});
+  sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nIV Therapy: Our doctors personally administer all IV treatments. An IV evaluation consult is required prior to treatment (can be same day).\n\nIV options: Myers Cocktail, NAD+, Vitamin C, Glutathione, Iron Infusion, Chelation, Hydrogen Peroxide, Ozone, Ketamine, and more.\n\nBook your IV consult:\n${CONFIG.intakeq.bookingUrl}\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\nQuestions? Call 678-443-4000`).catch(() => {});
   sendCallSummaryToStaff(callerPhone, `Reason: IV therapy inquiry\nSpeech: "${speech}"\nOutcome: Booking link sent`).catch(() => {});
   const g = gather(twiml, '/appt-schedule-confirm', { input: 'speech', speechTimeout: '3', timeout: 12 });
   say(g, "Would you like to go ahead and schedule your IV evaluation today?");
@@ -4697,7 +4697,7 @@ app.post('/appt-schedule-confirm', (req, res) => {
     twiml.redirect('/appt-patient-type');
   } else {
     say(twiml, `No problem at all! Whenever you are ready, you can book online any time at Taylor Medical Group dot net — just click Book Now. I am also texting you the link right now. Is there anything else I can help you with today?`);
-    sendSms(callerPhone, `Taylor Medical Group — Book Your IV Evaluation:\n${CONFIG.intakeq.bookingUrl}\n\nBook online 24/7 or call 678-443-4000.`).catch(() => {});
+    sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nBook Your IV Evaluation online 24/7:\n${CONFIG.intakeq.bookingUrl}\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\nQuestions? Call 678-443-4000`).catch(() => {});
     const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: '3', timeout: 10 });
     say(g, '');
     twiml.hangup();
@@ -4831,19 +4831,19 @@ app.post('/sms', async (req, res) => {
   const body = (req.body.Body || '').toLowerCase().trim();
   const twiml = new MessagingResponse();
   if (/portal|lab|result|login|prescription|refill/.test(body)) {
-    twiml.message(`Taylor Medical Group — Patient Portal:\n${CONFIG.intakeq.portalUrl}\n\nView lab results, prescriptions, submit refill requests, and message our team 24/7.`);
+    twiml.message(`TMG Phone Receptionist — Taylor Medical Group\n\nPatient Portal (labs, prescriptions, refills, messages):\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\nQuestions? Call 678-443-4000`);
   } else if (/appoint|book|schedul/.test(body)) {
-    twiml.message(`Taylor Medical Group — Book an Appointment:\n${CONFIG.intakeq.bookingUrl}\n\nWe see patients Mon, Thu & Fri. Call 678-443-4000 with questions.`);
+    twiml.message(`TMG Phone Receptionist — Taylor Medical Group\n\nBook an appointment online 24/7:\n${CONFIG.intakeq.bookingUrl}\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\nWe see patients Mon, Thu & Fri. Questions? Call 678-443-4000`);
   } else if (/cancel|reschedul/.test(body)) {
-    twiml.message(`Taylor Medical Group — Cancel or Reschedule:\n${CONFIG.intakeq.bookingUrl}\n\n24 business hours notice required. Late cancellations incur a $100 fee.`);
+    twiml.message(`TMG Phone Receptionist — Taylor Medical Group\n\nCancel or Reschedule:\n${CONFIG.intakeq.bookingUrl}\n\n24 business hours notice required. Late cancellations incur a $100 fee.\n\nPatient portal: ${CONFIG.intakeq.portalUrl}`);
   } else if (/address|direction|location|park/.test(body)) {
-    twiml.message(`Taylor Medical Group\n5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\nMaps: ${CONFIG.practice.mapsLink}\nDirections video: ${CONFIG.practice.youtubeNewPatient}\n\nPhone: 678-443-4000`);
+    twiml.message(`TMG Phone Receptionist — Taylor Medical Group\n\n5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\nMaps: ${CONFIG.practice.mapsLink}\nDirections video: ${CONFIG.practice.youtubeNewPatient}\n\nBook: ${CONFIG.intakeq.bookingUrl}\nPhone: 678-443-4000`);
   } else if (/hour|open|close/.test(body)) {
-    twiml.message(`Taylor Medical Group Hours:\nPatient appointments: Mon, Thu & Fri, 10am–5pm ET\nFriday closes at 3pm\nOffice admin: Mon–Fri, 9am–5pm\n\nBook: ${CONFIG.intakeq.bookingUrl}`);
+    twiml.message(`TMG Phone Receptionist — Taylor Medical Group\n\nHours:\nPatient appointments: Mon, Thu & Fri, 10am–5pm ET (Fri closes 3pm)\nOffice admin: Mon–Fri, 9am–5pm\n\nBook: ${CONFIG.intakeq.bookingUrl}\nPatient portal: ${CONFIG.intakeq.portalUrl}`);
   } else if (/price|cost|how much|fee/.test(body)) {
-    twiml.message(`Taylor Medical Group — Service Pricing:\n${CONFIG.intakeq.bookingUrl}\n\nVisit our booking page to view current service pricing. Pricing is updated directly in our scheduling system.\n\nQuestions? Call 678-443-4000`);
+    twiml.message(`TMG Phone Receptionist — Taylor Medical Group\n\nService Pricing — visit our booking page for current pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\nQuestions? Call 678-443-4000`);
   } else {
-    twiml.message(`Thank you for contacting Taylor Medical Group!\n\nBook: ${CONFIG.intakeq.bookingUrl}\nPortal: ${CONFIG.intakeq.portalUrl}\nWebsite: www.taylormedicalgroup.net\nCall: 678-443-4000 (Mon–Fri)`);
+    twiml.message(`TMG Phone Receptionist — Taylor Medical Group\n\nThank you for reaching out!\n\nBook an appointment: ${CONFIG.intakeq.bookingUrl}\nPatient portal: ${CONFIG.intakeq.portalUrl}\nWebsite: www.taylormedicalgroup.net\nCall: 678-443-4000 (Mon–Fri)`);
     escalateToStaff(from, 'SMS inquiry', body).catch(() => {});
   }
   res.type('text/xml').send(twiml.toString());
