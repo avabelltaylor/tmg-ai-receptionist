@@ -1303,6 +1303,8 @@ function detectIntent(speech) {
   if (/email/.test(s)) return 'email';
   if (/doctor|dr taylor|dr ava|speak with doctor|talk to doctor|call me back|call back/.test(s)) return 'transfer';
   if (/leave a message|leave message|voicemail|message for the doctor|message for the office/.test(s)) return 'voicemail';
+  // Correction intent — caller wants to fix info they already gave
+  if (/correct|fix|change|update|wrong (name|number|phone|email|address|date|birthday|dob)|i gave (you|the) wrong|let me redo|redo my|go back to|change my (name|number|phone|email|address|date|birthday)/.test(s)) return 'correct';
   return 'unknown';
 }
 
@@ -1647,14 +1649,49 @@ app.post('/intake-phone', (req, res) => {
   // Store the callback number (use caller ID as fallback if they say 'same' or 'this number')
   const saidSame = /same|this number|this one|you have it|already have/.test(speech.toLowerCase());
   if (saidSame) {
-    sess.collectedPhone = sess.callerPhone;
+    sess._pendingPhone = sess.callerPhone;
   } else {
     // Normalize spoken digits to E.164 format
     const digits = speech.replace(/\D/g, '').slice(-10);
-    sess.collectedPhone = digits.length >= 10 ? `+1${digits}` : sess.callerPhone;
+    sess._pendingPhone = digits.length >= 10 ? `+1${digits}` : sess.callerPhone;
   }
 
-  // Now ask how we can help
+  // Read back the number for confirmation before moving on
+  const phoneReadback = (sess._pendingPhone || '').replace(/\+1/, '').replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+  const g = gather(twiml, '/intake-confirm-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  say(g, `I have your number as ${phoneReadback} — is that correct?`);
+  res.type('text/xml').send(twiml.toString());
+});
+
+app.post('/intake-confirm-phone', (req, res) => {
+  const speech = (req.body.SpeechResult || '').toLowerCase().trim();
+  const callSid = req.body.CallSid;
+  const twiml = new VoiceResponse();
+  const sess = getSession(callSid);
+  const confirmed = /yes|correct|right|good|that.?s right|yep|yeah|uh.?huh|sounds good/.test(speech);
+  if (!confirmed) {
+    // Check if caller is providing the correction inline (e.g. "No, it's 678 555 1234")
+    const correctionInline = /^(no|nope|wrong|incorrect|wait|actually|i meant|sorry|that.?s wrong|not quite|not right|let me correct)[,\s]+(.+)/i.exec(req.body.SpeechResult || '');
+    if (correctionInline && correctionInline[2] && correctionInline[2].replace(/\D/g,'').length >= 10) {
+      const digits = correctionInline[2].replace(/\D/g, '').slice(-10);
+      sess._pendingPhone = digits.length >= 10 ? `+1${digits}` : sess.callerPhone;
+      const phoneReadback = sess._pendingPhone.replace(/\+1/, '').replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+      const g = gather(twiml, '/intake-confirm-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+      say(g, `Got it! I have your number as ${phoneReadback} — is that correct?`);
+      return res.type('text/xml').send(twiml.toString());
+    }
+    // Re-ask for the number
+    if (incrementFrustration(sess)) {
+      buildEscalationResponse(twiml, req.body.From || sess.callerPhone || 'anonymous', callSid, 'Could not confirm phone number after multiple attempts');
+      return res.type('text/xml').send(twiml.toString());
+    }
+    const g = gather(twiml, '/intake-phone', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    say(g, 'No problem! What is the best number to reach you at?');
+    return res.type('text/xml').send(twiml.toString());
+  }
+  // Confirmed — store and move on
+  sess.collectedPhone = sess._pendingPhone;
+  delete sess._pendingPhone;
   const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: '3', timeout: 15 });
   say(g, `Perfect, thank you ${sess.pronouncedName || sess.firstName}! How can I help you today?`);
   res.type('text/xml').send(twiml.toString());
@@ -1693,8 +1730,8 @@ app.post('/main-intent', (req, res) => {
   } else if (intent === 'pharmacy') {
     twiml.redirect('/pharmacy-start');
   } else if (intent === 'transfer') {
-    // Triage the caller before deciding what to do
-    twiml.redirect('/transfer-triage');
+    // No live transfer — take a message and notify staff immediately
+    twiml.redirect('/transfer-info');
   } else if (intent === 'voicemail') {
     twiml.redirect('/leave-message');
   } else if (intent === 'appointment') {
@@ -4233,7 +4270,7 @@ app.post('/nonpatient-message', async (req, res) => {
 app.post('/transfer-triage', (req, res) => {
   const twiml = new VoiceResponse();
   const g = gather(twiml, '/transfer-triage-response', { input: 'speech', speechTimeout: '3', timeout: 12 });
-  say(g, "Of course! Before I connect you, are you a new patient, an existing patient, or are you calling from a pharmacy?");
+  say(g, "Of course! I can't transfer calls directly, but I'll make sure our team gets your message right away. Please go ahead and tell me what you'd like them to know.");
   twiml.redirect('/transfer-triage-response');
   res.type('text/xml').send(twiml.toString());
 });
@@ -4403,8 +4440,27 @@ app.post('/iv-info', (req, res) => {
   say(twiml, `${ivDetail}Unlike many other clinics, our doctors personally administer all IV treatments. All patients must first be evaluated by one of our doctors prior to receiving IV therapy — this can often be done on the same day as your first treatment. The doctor will review your medical history and recommend the IV that is right for you. Please visit Taylor Medical Group dot net and click Patient Portal in the top right corner to book your IV therapy appointment.`);
   sendSms(callerPhone, `Taylor Medical Group — IV Therapy\n\nOur doctors personally administer all IV treatments. An IV evaluation consult is required prior to treatment (can be same day).\n\nIV options include: Myers Cocktail, NAD+, Vitamin C, Glutathione, Iron Infusion, Chelation (EDTA/DMSO/DTPA), Hydrogen Peroxide, Ozone, Ketamine, and more.\n\nBook your IV consult:\n${CONFIG.intakeq.bookingUrl}\n\nPricing: www.taylormedicalgroup.net/pricing`).catch(() => {});
   sendCallSummaryToStaff(callerPhone, `Reason: IV therapy inquiry\nSpeech: "${speech}"\nOutcome: Booking link sent`).catch(() => {});
-  const g = gather(twiml, '/appt-patient-type', { timeout: 10 });
-  say(g, "Would you like to go ahead and schedule your IV evaluation? Are you a new patient, or an existing patient?");
+  const g = gather(twiml, '/appt-schedule-confirm', { input: 'speech', speechTimeout: '3', timeout: 12 });
+  say(g, "Would you like to go ahead and schedule your IV evaluation today?");
+  res.type('text/xml').send(twiml.toString());
+});
+
+app.post('/appt-schedule-confirm', (req, res) => {
+  const speech = (req.body.SpeechResult || '').toLowerCase().trim();
+  const callSid = req.body.CallSid;
+  const twiml = new VoiceResponse();
+  const sess = getSession(callSid);
+  const callerPhone = req.body.From || sess.callerPhone || 'anonymous';
+  const wantsToBook = /yes|yeah|yep|sure|please|go ahead|schedule|book|absolutely|definitely|i would|i do|let.?s do|sounds good/.test(speech);
+  if (wantsToBook) {
+    twiml.redirect('/appt-patient-type');
+  } else {
+    say(twiml, `No problem at all! Whenever you are ready, you can book online any time at Taylor Medical Group dot net — just click Book Now. I am also texting you the link right now. Is there anything else I can help you with today?`);
+    sendSms(callerPhone, `Taylor Medical Group — Book Your IV Evaluation:\n${CONFIG.intakeq.bookingUrl}\n\nBook online 24/7 or call 678-443-4000.`).catch(() => {});
+    const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: '3', timeout: 10 });
+    say(g, '');
+    twiml.hangup();
+  }
   res.type('text/xml').send(twiml.toString());
 });
 
