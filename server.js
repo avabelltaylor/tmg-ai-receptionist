@@ -730,7 +730,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
     service: 'tmg-ai-receptionist',
-    version: 'v7.39',
+    version: 'v7.40',
     uptime: Math.round(process.uptime()),
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'production',
