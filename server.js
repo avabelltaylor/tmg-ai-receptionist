@@ -109,6 +109,15 @@ const CONFIG = {
     authToken: process.env.TWILIO_AUTH_TOKEN,
     phoneNumber: process.env.TWILIO_PHONE_NUMBER || process.env.TWILIO_CLINIC_NUMBER || '+14047366917',
   },
+  ringcentral: {
+    clientId: process.env.RC_CLIENT_ID,
+    clientSecret: process.env.RC_CLIENT_SECRET,
+    username: process.env.RC_USERNAME || '6784434000',
+    password: process.env.RC_PASSWORD,
+    extension: process.env.RC_EXTENSION || '101',
+    fromNumber: process.env.RC_FROM_NUMBER || '+16784434000',
+    server: 'https://platform.ringcentral.com',
+  },
   intakeq: {
     apiKey: process.env.INTAKEQ_API_KEY,
     baseUrl: 'https://intakeq.com/api/v1',
@@ -424,6 +433,46 @@ function gather(twiml, action, opts = {}) {
   });
 }
 
+// ─── RingCentral SMS via REST API (JWT / Password Grant) ─────────────────────
+let _rcAccessToken = null;
+let _rcTokenExpiry = 0;
+
+async function getRcAccessToken() {
+  if (_rcAccessToken && Date.now() < _rcTokenExpiry - 60000) return _rcAccessToken;
+  const { clientId, clientSecret, username, password, extension, server } = CONFIG.ringcentral;
+  if (!clientId || !clientSecret || !username || !password) {
+    console.warn('[RC SMS] Missing RC credentials — cannot obtain access token');
+    return null;
+  }
+  try {
+    const creds = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    const params = new URLSearchParams({
+      grant_type: 'password',
+      username,
+      extension: extension || '',
+      password,
+    });
+    const resp = await axios.post(
+      `${server}/restapi/oauth/token`,
+      params.toString(),
+      {
+        headers: {
+          'Authorization': `Basic ${creds}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        timeout: 10000,
+      }
+    );
+    _rcAccessToken = resp.data.access_token;
+    _rcTokenExpiry = Date.now() + (resp.data.expires_in || 3600) * 1000;
+    console.log('[RC SMS] Access token obtained, expires in', resp.data.expires_in, 's');
+    return _rcAccessToken;
+  } catch (err) {
+    console.error('[RC SMS] Token error:', err.response?.data || err.message);
+    return null;
+  }
+}
+
 async function sendSms(to, body) {
   if (!to || to === 'anonymous') return;
   // Normalize to E.164 — strip non-digits, take last 10, prepend +1
@@ -432,10 +481,32 @@ async function sendSms(to, body) {
   if (digits.length === 10) normalized = `+1${digits}`;
   else if (digits.length === 11 && digits.startsWith('1')) normalized = `+${digits}`;
   else if (!to.startsWith('+')) normalized = `+1${digits.slice(-10)}`;
+
+  // ── Try RingCentral first ──────────────────────────────────────────────────
+  const rcCfg = CONFIG.ringcentral;
+  if (rcCfg.clientId && rcCfg.clientSecret && rcCfg.password) {
+    const token = await getRcAccessToken();
+    if (token) {
+      try {
+        await axios.post(
+          `${rcCfg.server}/restapi/v1.0/account/~/extension/~/sms`,
+          { from: { phoneNumber: rcCfg.fromNumber }, to: [{ phoneNumber: normalized }], text: body },
+          { headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }, timeout: 15000 }
+        );
+        console.log('[RC SMS] Sent to', normalized);
+        return;
+      } catch (err) {
+        console.error('[RC SMS] Send failed:', err.response?.data || err.message, '| to:', normalized);
+        // Fall through to Twilio fallback
+      }
+    }
+  }
+
+  // ── Twilio fallback ────────────────────────────────────────────────────────
   const client = getTwilioClient();
-  if (!client) return;
+  if (!client) { console.warn('[SMS] No SMS provider available — message not sent to', normalized); return; }
   try { await client.messages.create({ body, from: CONFIG.twilio.phoneNumber, to: normalized }); }
-  catch (err) { console.error('[SMS]', err.message, '| to:', normalized); }
+  catch (err) { console.error('[SMS Twilio fallback]', err.message, '| to:', normalized); }
 }
 
 // ─── Email via Resend API ─────────────────────────────────────────────────────
