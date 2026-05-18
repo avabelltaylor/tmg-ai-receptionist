@@ -579,7 +579,7 @@ async function sendPortalLinkToPatient(toEmail, patientName) {
       <p style="color: #718096; font-size: 12px; margin-top: 24px;">Taylor Medical Group &mdash; 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25, Sandy Springs, GA 30328</p>
     </div>
   `;
-  const textBody = `Taylor Medical Group — Patient Portal\n\nHello ${displayName},\n\nHere is your patient portal link:\nhttps://www.taylormedicalgroup.net\n\nClick Patient Portal in the top right corner to log in and message our team.\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nQuestions? Call 678-443-4000`;
+  const textBody = `Taylor Medical Group — Patient Portal\n\nHello ${displayName},\n\nHere is your patient portal link:\nhttps://www.taylormedicalgroup.net\n\nClick Patient Portal in the top right corner to log in and message our team.\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.\n\nQuestions? Call 678-443-4000`;
   try {
     const response = await axios.post(
       'https://api.resend.com/emails',
@@ -1922,7 +1922,7 @@ app.post('/main-intent', (req, res) => {
     twiml.redirect('/refill-start');
   } else if (intent === 'labs' || intent === 'portal') {
     say(twiml, "Of course! Great news — you can check your lab results, view your prescriptions, request refills, and message our team any time through the patient portal. I'm texting you the link right now!");
-    sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nPatient Portal (labs, prescriptions, messages):\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nQuestions? Call 678-443-4000`).catch(() => {});
+    sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nPatient Portal (labs, prescriptions, messages):\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.\n\nQuestions? Call 678-443-4000`).catch(() => {});
     sendCallSummaryToStaff(callerPhone, `Reason: Lab results / portal access\nOutcome: Portal link sent`).catch(() => {});
     const g = gather(twiml, '/main-intent', { timeout: 8 });
     say(g, "Is there anything else I can do for you today?");
@@ -1931,7 +1931,7 @@ app.post('/main-intent', (req, res) => {
     twiml.redirect('/directions-info');
   } else if (intent === 'hours') {
     say(twiml, "Great question! Our phones are available Monday through Friday, 9 AM to 5 PM Eastern. We see patients in the office on Mondays, Thursdays, and Fridays from 10 AM to 5 PM — and Fridays we wrap up at 3. You can also book online any time — I'm sending you the link right now!");
-    sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nBook an appointment online 24/7:\n${CONFIG.intakeq.bookingUrl}\n\nPatient hours: Mon, Thu & Fri 10am–5pm ET (Fri closes 3pm)\nAdmin: Mon–Fri 9am–5pm\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nQuestions? Call 678-443-4000`).catch(() => {});
+    sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nBook an appointment online 24/7:\n${CONFIG.intakeq.bookingUrl}\n\nPatient hours: Mon, Thu & Fri 10am–5pm ET (Fri closes 3pm)\nAdmin: Mon–Fri 9am–5pm\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.\n\nQuestions? Call 678-443-4000`).catch(() => {});
     const g = gather(twiml, '/main-intent', { timeout: 8 });
     say(g, "Is there anything else I can do for you today?");
     twiml.hangup();
@@ -1939,7 +1939,7 @@ app.post('/main-intent', (req, res) => {
     twiml.redirect('/telehealth-info');
   } else if (intent === 'children') {
     say(twiml, "Yes, we do see children as long as they are cooperative. I'd be happy to get them scheduled! Are you calling to book a new patient visit for your child?");
-    sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nBook an appointment online 24/7:\n${CONFIG.intakeq.bookingUrl}\n\nWe see children as long as they are cooperative.\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nQuestions? Call 678-443-4000`).catch(() => {});
+    sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nBook an appointment online 24/7:\n${CONFIG.intakeq.bookingUrl}\n\nWe see children as long as they are cooperative.\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.\n\nQuestions? Call 678-443-4000`).catch(() => {});
     const g = gather(twiml, '/appt-patient-type', { timeout: 10 });
     say(g, "Would you like to schedule an appointment?");
   } else if (intent === 'iv') {
@@ -1997,7 +1997,7 @@ app.post('/unknown-choice', (req, res) => {
     twiml.redirect('/leave-message');
   } else {
     say(twiml, "Absolutely! I want to make sure you get the right help, so I'm sending you the patient portal link right now. You can message the doctors directly there and they will personally get back to you. You're in great hands!");
-    sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nMessage our doctors directly through the patient portal:\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nQuestions? Call 678-443-4000`).catch(() => {});
+    sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nMessage our doctors directly through the patient portal:\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.\n\nQuestions? Call 678-443-4000`).catch(() => {});
     sendCallSummaryToStaff(callerPhone, `Reason: Unknown question — portal link sent`).catch(() => {});
     const g = gather(twiml, '/main-intent', { timeout: 8 });
     say(g, "Is there anything else I can do for you today?");
@@ -2119,49 +2119,49 @@ app.post('/billing-info', async (req, res) => {
 
   if (/iron infusion/.test(speech)) {
     response = "Yes, we absolutely offer iron infusion therapy. We don't accept insurance, but we do accept HSA and FSA cards, and we offer financing through CareCredit. I'm sending you our booking link with full pricing right now — would you like me to schedule an appointment for you today?";
-    smsBody = `TMG Iron Infusions — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG Iron Infusions — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/vitamin c|high dose c/.test(speech)) {
     response = "We do offer high-dose Vitamin C IV therapy. For current pricing, please visit our booking link. I'm sending it to you now.";
-    smsBody = `TMG Vitamin C IV — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG Vitamin C IV — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/glutathione/.test(speech)) {
     response = "We do offer glutathione IV therapy. For current pricing, please visit our booking link. I'm sending it to you now.";
-    smsBody = `TMG Glutathione IV — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG Glutathione IV — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/ozone iv/.test(speech)) {
     response = "We do offer ozone IV therapy. For current pricing, please visit our booking link. I'm sending it to you now.";
-    smsBody = `TMG Ozone IV — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG Ozone IV — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/hydrogen peroxide/.test(speech)) {
     response = "We do offer hydrogen peroxide IV therapy. For current pricing, please visit our booking link. I'm sending it to you now.";
-    smsBody = `TMG Hydrogen Peroxide IV — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG Hydrogen Peroxide IV — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/nad/.test(speech)) {
     response = "We do offer NAD IV therapy. For current pricing, please visit our booking link. I'm sending it to you now.";
-    smsBody = `TMG NAD IV — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG NAD IV — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/hydration/.test(speech)) {
     response = "We do offer hydration IV therapy. For current pricing, please visit our booking link. I'm sending it to you now.";
-    smsBody = `TMG Hydration IV — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG Hydration IV — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/ketamine/.test(speech)) {
     response = "We do offer ketamine IV therapy. For current pricing, please visit our booking link. I'm sending it to you now.";
-    smsBody = `TMG Ketamine IV — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG Ketamine IV — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/myers/.test(speech)) {
     response = "We do offer the Myers Cocktail IV. For current pricing, please visit our booking link. I'm sending it to you now.";
-    smsBody = `TMG Myers Cocktail IV — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG Myers Cocktail IV — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/chelation|dtpa|edta/.test(speech)) {
     response = "We do offer chelation IV therapy. For current pricing, please visit our booking link. I'm sending it to you now.";
-    smsBody = `TMG Chelation IV — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG Chelation IV — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/magnesium/.test(speech)) {
     response = "We do offer magnesium IV therapy. For current pricing, please visit our booking link. I'm sending it to you now.";
-    smsBody = `TMG Magnesium IV — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG Magnesium IV — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/saliva|hormone test|hormone kit/.test(speech)) {
     response = "We do offer saliva hormone testing kits. For current pricing, please visit our booking link. I'm sending it to you now.";
-    smsBody = `TMG Saliva Hormone Testing — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\nHormone video: ${CONFIG.practice.youtubeHormone}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG Saliva Hormone Testing — Book & Pricing:\n${CONFIG.intakeq.bookingUrl}\nHormone video: ${CONFIG.practice.youtubeHormone}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/invoice|my bill|my balance|what do i owe|my account|my charges/.test(speech)) {
     response = "To view your invoices and account balance, please log in to your patient portal. I'm sending you the portal link by both text and email right now.";
     smsBody = `TMG Patient Portal (view invoices):\n${CONFIG.intakeq.portalUrl}`;
   } else if (/office visit|new patient|follow.?up|established|initial visit|evaluation|cost of a visit|price of a visit/.test(speech)) {
     response = "For current visit pricing, please visit our booking link where all service options and details are listed. We don't accept insurance, but we do accept HSA and FSA cards. I'm sending you the booking link now.";
-    smsBody = `TMG Visit Booking & Pricing:\n${CONFIG.intakeq.bookingUrl}\nHSA/FSA accepted.\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG Visit Booking & Pricing:\n${CONFIG.intakeq.bookingUrl}\nHSA/FSA accepted.\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else {
     response = "For current pricing on any of our services, please visit our booking link or our website at www.taylormedicalgroup.net. Prices are always up to date there. I'm sending you the link by both text and email.";
-    smsBody = `TMG Booking & Pricing:\n${CONFIG.intakeq.bookingUrl}\nWebsite: www.taylormedicalgroup.net\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG Booking & Pricing:\n${CONFIG.intakeq.bookingUrl}\nWebsite: www.taylormedicalgroup.net\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   }
 
   say(twiml, response);
@@ -2179,68 +2179,68 @@ app.post('/services-info', (req, res) => {
   const speech = (req.body.SpeechResult || '').toLowerCase();
   const twiml = new VoiceResponse();
   let response = '';
-  let smsBody = `Book: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+  let smsBody = `Book: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
 
   if (/bhrt|bioidentical|bio.identical|hormone replacement/.test(speech)) {
     response = "Yes, we offer bioidentical hormone replacement therapy. We prescribe compound hormones identical to what your body naturally makes, which leads to better outcomes and fewer side effects. I'm sending you the booking link and a helpful video.";
-    smsBody = `TMG — BHRT:\nBook: ${CONFIG.intakeq.bookingUrl}\nHormone video: ${CONFIG.practice.youtubeHormone}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG — BHRT:\nBook: ${CONFIG.intakeq.bookingUrl}\nHormone video: ${CONFIG.practice.youtubeHormone}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/testosterone/.test(speech)) {
     response = "Yes, we offer testosterone replacement for both women and men. I'm sending you the booking link and a helpful video.";
-    smsBody = `TMG — Testosterone Replacement:\nBook: ${CONFIG.intakeq.bookingUrl}\nVideo: ${CONFIG.practice.youtubeHormone}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG — Testosterone Replacement:\nBook: ${CONFIG.intakeq.bookingUrl}\nVideo: ${CONFIG.practice.youtubeHormone}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/weight loss|semaglutide|ozempic|tirzepatide|mounjaro|glp.?1|retatrutide/.test(speech)) {
     response = "Yes, we offer medically supervised weight loss including GLP-1 medications like semaglutide and tirzepatide. I'm sending you the booking link.";
-    smsBody = `TMG — Medical Weight Loss:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG — Medical Weight Loss:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/pcos/.test(speech)) {
     response = "Yes, we treat PCOS. I'm sending you the booking link and a helpful video.";
-    smsBody = `TMG — PCOS Treatment:\nBook: ${CONFIG.intakeq.bookingUrl}\nVideo: ${CONFIG.practice.youtubeHormone}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG — PCOS Treatment:\nBook: ${CONFIG.intakeq.bookingUrl}\nVideo: ${CONFIG.practice.youtubeHormone}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/menopause/.test(speech)) {
     response = "Yes, we treat menopause and perimenopause. I'm sending you the booking link and a helpful video.";
-    smsBody = `TMG — Menopause/Perimenopause:\nBook: ${CONFIG.intakeq.bookingUrl}\nVideo: ${CONFIG.practice.youtubeHormone}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG — Menopause/Perimenopause:\nBook: ${CONFIG.intakeq.bookingUrl}\nVideo: ${CONFIG.practice.youtubeHormone}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/thyroid/.test(speech)) {
     response = "Yes, we treat thyroid disorders holistically. I'm sending you the booking link.";
-    smsBody = `TMG — Thyroid Treatment:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG — Thyroid Treatment:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/erectile|ed\b/.test(speech)) {
     response = "Yes, we treat erectile dysfunction holistically. I'm sending you the booking link.";
-    smsBody = `TMG — Erectile Dysfunction:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG — Erectile Dysfunction:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/sex drive|libido/.test(speech)) {
     response = "Yes, we treat low sex drive for both men and women. I'm sending you the booking link.";
-    smsBody = `TMG — Low Sex Drive:\nBook: ${CONFIG.intakeq.bookingUrl}\nVideo: ${CONFIG.practice.youtubeHormone}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG — Low Sex Drive:\nBook: ${CONFIG.intakeq.bookingUrl}\nVideo: ${CONFIG.practice.youtubeHormone}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/hot flash|night sweat/.test(speech)) {
     response = "Yes, we treat hot flashes and night sweats holistically. I'm sending you the booking link.";
-    smsBody = `TMG — Hot Flashes/Night Sweats:\nBook: ${CONFIG.intakeq.bookingUrl}\nVideo: ${CONFIG.practice.youtubeHormone}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG — Hot Flashes/Night Sweats:\nBook: ${CONFIG.intakeq.bookingUrl}\nVideo: ${CONFIG.practice.youtubeHormone}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/insomnia|sleep/.test(speech)) {
     response = "Yes, we treat insomnia and sleep problems holistically. I'm sending you the booking link.";
-    smsBody = `TMG — Sleep/Insomnia:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG — Sleep/Insomnia:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/fatigue|tired|exhausted|energy/.test(speech)) {
     response = "Yes, we treat chronic fatigue and low energy holistically. I'm sending you the booking link.";
-    smsBody = `TMG — Fatigue/Low Energy:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG — Fatigue/Low Energy:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/brain fog|memory|focus|cognitive/.test(speech)) {
     response = "Yes, we treat brain fog and cognitive issues holistically. I'm sending you the booking link.";
-    smsBody = `TMG — Brain Fog/Cognitive:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG — Brain Fog/Cognitive:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/hair loss|hair thinning/.test(speech)) {
     response = "Yes, we treat hair loss and thinning holistically. I'm sending you the booking link.";
-    smsBody = `TMG — Hair Loss:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG — Hair Loss:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/botox|filler|cosmetic|aesthetic|microneedling|prp|o.shot|p.shot/.test(speech)) {
     response = "Yes, we offer cosmetic and aesthetic services including Botox, fillers, microneedling, PRP, O-Shot, and P-Shot. I'm sending you the booking link.";
-    smsBody = `TMG — Cosmetic/Aesthetic Services:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG — Cosmetic/Aesthetic Services:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/stem cell|exosome/.test(speech)) {
     response = "Yes, we offer stem cell and exosome therapy. I'm sending you the booking link.";
-    smsBody = `TMG — Stem Cell/Exosome:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG — Stem Cell/Exosome:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/peptide/.test(speech)) {
     response = "Yes, we offer peptide therapy. I'm sending you the booking link.";
-    smsBody = `TMG — Peptide Therapy:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG — Peptide Therapy:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/ozone/.test(speech)) {
     response = "Yes, we offer ozone therapy including ozone IV and other ozone treatments. I'm sending you the booking link.";
-    smsBody = `TMG — Ozone Therapy:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG — Ozone Therapy:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/autoimmune|lupus|lyme|fibromyalgia/.test(speech)) {
     response = "Yes, we treat autoimmune conditions holistically. I'm sending you the booking link.";
-    smsBody = `TMG — Autoimmune/Chronic Illness:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG — Autoimmune/Chronic Illness:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else if (/gut|digestive|leaky gut|parasite|detox/.test(speech)) {
     response = "Yes, we treat gut health issues and offer detox programs. I'm sending you the booking link.";
-    smsBody = `TMG — Gut Health/Detox:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG — Gut Health/Detox:\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   } else {
     response = "We offer a wide range of services including hormone therapy, weight loss, IV therapy, cosmetic treatments, gut health, and much more. I'm sending you the booking link and you can also visit our website at Taylor Medical Group dot net for a full list of services.";
-    smsBody = `TMG Services:\nwww.taylormedicalgroup.net\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+    smsBody = `TMG Services:\nwww.taylormedicalgroup.net\nBook: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
   }
 
   say(twiml, response);
@@ -2612,7 +2612,7 @@ app.post('/refill-process', async (req, res) => {
 
   if (isThyroid) {
     say(twiml, `For thyroid medications, our doctors require a current blood test through LabCorp before issuing a refill. This ensures your dosage is still right for you. I'm sending you the patient portal link right now — please message the doctors there and they'll send you the LabCorp order. Once your results are in, the doctors will issue a 30-day refill.`);
-    sendSms(sess.callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nThyroid Refill: A current LabCorp blood test is required.\n\nMessage our doctors to request your lab order:\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nQuestions? Call 678-443-4000`).catch(() => {});
+    sendSms(sess.callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nThyroid Refill: A current LabCorp blood test is required.\n\nMessage our doctors to request your lab order:\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.\n\nQuestions? Call 678-443-4000`).catch(() => {});
     escalateToStaff(sess.callerPhone, 'Thyroid refill — LabCorp order needed', `Patient: ${sess.refillClientName} | Medication: ${speech}`).catch(() => {});
     sendCallSummaryToStaff(sess.callerPhone, `Reason: Thyroid refill\nPatient: ${sess.refillClientName}\nMedication: ${speech}\nOutcome: Portal link sent, staff alerted for LabCorp order`).catch(() => {});
   } else {
@@ -2622,7 +2622,7 @@ app.post('/refill-process', async (req, res) => {
       const monthsAgo = lastAppt ? (now - lastAppt) / (1000 * 60 * 60 * 24 * 30) : 999;
       if (monthsAgo <= 6) {
         say(twiml, `Great news! Since you were seen within the past 6 months, I can submit your refill request right now. I'm sending you the patient portal link — you can also view all your prescriptions and submit refill requests directly through the portal anytime.`);
-        sendSms(sess.callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nYour refill request for ${speech} has been noted.\n\nView prescriptions & submit requests:\n${CONFIG.intakeq.portalUrl}\n\nAllow up to 10 business days for processing.\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nQuestions? Call 678-443-4000`).catch(() => {});
+        sendSms(sess.callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nYour refill request for ${speech} has been noted.\n\nView prescriptions & submit requests:\n${CONFIG.intakeq.portalUrl}\n\nAllow up to 10 business days for processing.\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.\n\nQuestions? Call 678-443-4000`).catch(() => {});
         escalateToStaff(sess.callerPhone, 'Prescription refill request', `Patient: ${sess.refillClientName} (ID: ${sess.refillClientNumber}) | Medication: ${speech} | Last visit: ${lastAppt ? lastAppt.toLocaleDateString() : 'unknown'}`).catch(() => {});
         sendCallSummaryToStaff(sess.callerPhone, `Reason: Prescription refill\nPatient: ${sess.refillClientName}\nMedication: ${speech}\nLast visit: ${lastAppt ? lastAppt.toLocaleDateString() : 'unknown'}\nOutcome: Refill submitted, portal link sent`).catch(() => {});
       } else {
@@ -2635,7 +2635,7 @@ app.post('/refill-process', async (req, res) => {
     } catch (err) {
       console.error('[REFILL PROCESS]', err.message);
       say(twiml, "I'm having a little trouble checking your records right now. Let me send you the patient portal link where you can submit your refill request directly.");
-      sendSms(sess.callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nPatient Portal (submit refills, view prescriptions):\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nQuestions? Call 678-443-4000`).catch(() => {});
+      sendSms(sess.callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nPatient Portal (submit refills, view prescriptions):\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.\n\nQuestions? Call 678-443-4000`).catch(() => {});
     }
   }
   const g = gather(twiml, '/main-intent', { timeout: 8 }); say(g, "Is there anything else I can help you with today?"); twiml.hangup();
@@ -2660,7 +2660,7 @@ app.post('/refill-bridge-choice', (req, res) => {
     const g = gather(twiml, '/main-intent', { timeout: 8 }); say(g, "Is there anything else I can help you with today?"); twiml.hangup();
   } else {
     say(twiml, "I completely understand. The best way to get a message directly to the doctors is through the patient portal. I'm sending you the link right now — you can explain your situation there and the doctors will respond personally.");
-    sendSms(sess.callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nMessage our doctors:\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nQuestions? Call 678-443-4000`).catch(() => {});
+    sendSms(sess.callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nMessage our doctors:\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.\n\nQuestions? Call 678-443-4000`).catch(() => {});
     escalateToStaff(sess.callerPhone, 'Refill — patient dissatisfied with bridge policy', `Patient: ${sess.refillClientName} | Medication: ${sess.refillMedication}`).catch(() => {});
     sendCallSummaryToStaff(sess.callerPhone, `Reason: Refill bridge — patient declined options\nPatient: ${sess.refillClientName}\nMedication: ${sess.refillMedication}\nOutcome: Portal link sent, staff alerted`).catch(() => {});
     const g = gather(twiml, '/main-intent', { timeout: 8 }); say(g, "Is there anything else I can help you with today?"); twiml.hangup();
@@ -3705,7 +3705,7 @@ app.post('/appt-send-pin', async (req, res) => {
     const isNew = !existingPin;
     const pinMsg = isNew
       ? `TMG Phone Receptionist — Taylor Medical Group\n\nYour Security PIN: ${pin}\n\nSave this — you'll use it every time you call to verify your identity.\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nBook an appointment: ${CONFIG.intakeq.bookingUrl}`
-      : `TMG Phone Receptionist — Taylor Medical Group\n\nYour Security PIN: ${pin}\n\nUse this to verify your identity on future calls.\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nBook an appointment: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.`;
+      : `TMG Phone Receptionist — Taylor Medical Group\n\nYour Security PIN: ${pin}\n\nUse this to verify your identity on future calls.\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nBook an appointment: ${CONFIG.intakeq.bookingUrl}\n\nPortal: ${CONFIG.intakeq.portalUrl}\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.`;
     await sendSms(smsTarget, pinMsg).catch(() => {});
 
     // Also email the PIN to the patient's email on file (SMS fallback during A2P pending)
@@ -4130,7 +4130,7 @@ app.post('/appt-save-visit-reason', (req, res) => {
   // If new patient mentions detailed info, offer portal
   const wantsPortal = /detail|message|explain|lot to say|complicated|complex|long story|lot of|send.*link|portal/.test(speech.toLowerCase());
   if (isNew && wantsPortal) {
-    sendSms(sess.callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nMessage our doctors before your appointment so they can prepare:\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nQuestions? Call 678-443-4000`).catch(() => {});
+    sendSms(sess.callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nMessage our doctors before your appointment so they can prepare:\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.\n\nQuestions? Call 678-443-4000`).catch(() => {});
     say(twiml, `Absolutely! I’ve just sent you the patient portal link. You can log in and send the doctors a detailed message before your appointment so they’re fully prepared. Let me go ahead and pull up our available times for you now.`);
   } else {
     say(twiml, `Got it — I’ve noted that. Let me pull up our available times for you.`);
@@ -4170,7 +4170,7 @@ app.post('/appt-find-slots', async (req, res) => {
   } catch (err) {
     console.error('[SLOTS]', err.message);
     say(twiml, "I'm having a little trouble with our scheduling system right now. Please visit Taylor Medical Group dot net and click Patient Portal in the top right corner to book online.");
-    sendSms(sess.callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nBook an appointment online 24/7:\n${CONFIG.intakeq.bookingUrl}\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nQuestions? Call 678-443-4000`).catch(() => {});
+    sendSms(sess.callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nBook an appointment online 24/7:\n${CONFIG.intakeq.bookingUrl}\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.\n\nQuestions? Call 678-443-4000`).catch(() => {});
     twiml.hangup();
     return res.type('text/xml').send(twiml.toString());
   }
@@ -4216,7 +4216,7 @@ app.post('/appt-sooner-date', async (req, res) => {
   const sess = getSession(callSid);
   const preferredTime = speech || 'as soon as possible';
   await escalateToStaff(sess.callerPhone, 'Patient requesting earlier appointment', `Patient: ${sess.firstName || ''} ${sess.lastName || ''} | Service: ${sess.serviceName || ''} | Preferred: ${preferredTime}`).catch(() => {});
-  await sendSms(sess.callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nEarlier Appointment Request: Your request for ${preferredTime} has been sent to our office.\n\nThe team will reach out through the patient portal:\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nQuestions? Call 678-443-4000`).catch(() => {});
+  await sendSms(sess.callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nEarlier Appointment Request: Your request for ${preferredTime} has been sent to our office.\n\nThe team will reach out through the patient portal:\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.\n\nQuestions? Call 678-443-4000`).catch(() => {});
   say(twiml, `Perfect! I've sent your request for ${preferredTime} to our office right now. The team will reach out to you through the patient portal with your appointment options. Please visit Taylor Medical Group dot net and click Patient Portal in the top right corner to log in so our team can reach you.`);
   sendCallSummaryToStaff(sess.callerPhone, `Reason: Earlier appointment request\nPatient: ${sess.firstName || ''} ${sess.lastName || ''}\nService: ${sess.serviceName || ''}\nPreferred: ${preferredTime}`).catch(() => {});
   const g = gather(twiml, '/main-intent', { timeout: 8 }); say(g, "Is there anything else I can do for you today?"); twiml.hangup();
@@ -4260,10 +4260,10 @@ app.post('/appt-confirm-booking', async (req, res) => {
 
     if (requiresForms) {
       // New patient, annual visit, or telehealth: forms sent automatically via portal
-      confirmSms += `📋 Your patient forms have been automatically sent to your email via the patient portal. Please complete and submit them at least 24 business hours before your appointment.\n\n⚠️ IMPORTANT: If forms are not received at least 24 business hours before your appointment, your appointment will be cancelled and you will need to reschedule.\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nQuestions? Call 678-443-4000`;
+      confirmSms += `📋 Your patient forms have been automatically sent to your email via the patient portal. Please complete and submit them at least 24 business hours before your appointment.\n\n⚠️ IMPORTANT: If forms are not received at least 24 business hours before your appointment, your appointment will be cancelled and you will need to reschedule.\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.\n\nQuestions? Call 678-443-4000`;
     } else {
       // Established patient standard follow-up: standard confirmation
-      confirmSms += `📋 Please log in to your patient portal to review your appointment details:\n${CONFIG.intakeq.portalUrl}\n\nTo cancel or reschedule (24hr notice required):\n${CONFIG.intakeq.bookingUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nQuestions? Call 678-443-4000`;
+      confirmSms += `📋 Please log in to your patient portal to review your appointment details:\n${CONFIG.intakeq.portalUrl}\n\nTo cancel or reschedule (24hr notice required):\n${CONFIG.intakeq.bookingUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.\n\nQuestions? Call 678-443-4000`;
     }
 
     await sendSms(sess.callerPhone, confirmSms).catch(() => {});
@@ -4380,7 +4380,7 @@ app.post('/records-info', (req, res) => {
   const callerPhone = req.body.From || 'anonymous';
   const twiml = new VoiceResponse();
   say(twiml, "Medical records are released according to our office policies. Please note that lab results are provided at the time of your appointment — requests outside of appointment times become a formal medical records request and fees do apply. You can submit your medical records request through the patient portal at Taylor Medical Group dot net — click Patient Portal in the top right corner.");
-  sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nMedical Records Request: Submit through the patient portal:\n${CONFIG.intakeq.portalUrl}\n\nFees apply for records requested outside of appointments. See your signed office policy for details.\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nQuestions? Call 678-443-4000`).catch(() => {});
+  sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nMedical Records Request: Submit through the patient portal:\n${CONFIG.intakeq.portalUrl}\n\nFees apply for records requested outside of appointments. See your signed office policy for details.\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.\n\nQuestions? Call 678-443-4000`).catch(() => {});
   sendCallSummaryToStaff(callerPhone, `Reason: Medical records request\nOutcome: Portal link sent`).catch(() => {});
   const g = gather(twiml, '/main-intent', { timeout: 8 }); say(g, "Is there anything else I can help you with today?"); twiml.hangup();
   res.type('text/xml').send(twiml.toString());
@@ -4541,7 +4541,7 @@ app.post('/transfer-info', (req, res) => {
   sess.callerPhone = callerPhone;
   // Per Dr. Taylor's protocol: all direct patient-to-doctor communication goes through the patient portal
   say(twiml, "I completely understand, and I want to make sure you get the best help possible. Our doctors have asked that all direct patient communication go through our secure patient portal — that way they can respond to you personally. I'm sending you the portal link right now by text!");
-  sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nPatient Portal (appointments, prescriptions, lab results, messages):\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nQuestions? Call 678-443-4000`).catch(() => {});
+  sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nPatient Portal (appointments, prescriptions, lab results, messages):\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.\n\nQuestions? Call 678-443-4000`).catch(() => {});
   const g = gather(twiml, '/take-message-content', { input: 'speech', speechTimeout: '3', timeout: 20 });
   say(g, "Is there anything else I can help you with today, or would you also like to leave a message for our team?");
   res.type('text/xml').send(twiml.toString());
@@ -4679,7 +4679,7 @@ app.post('/iv-info', (req, res) => {
     ivDetail = 'Yes, we offer ketamine IV therapy. ';
   }
   say(twiml, `${ivDetail}Unlike many other clinics, our doctors personally administer all IV treatments. All patients must first be evaluated by one of our doctors prior to receiving IV therapy — this can often be done on the same day as your first treatment. The doctor will review your medical history and recommend the IV that is right for you. Please visit Taylor Medical Group dot net and click Patient Portal in the top right corner to book your IV therapy appointment.`);
-  sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nIV Therapy: Our doctors personally administer all IV treatments. An IV evaluation consult is required prior to treatment (can be same day).\n\nIV options: Myers Cocktail, NAD+, Vitamin C, Glutathione, Iron Infusion, Chelation, Hydrogen Peroxide, Ozone, Ketamine, and more.\n\nBook your IV consult:\n${CONFIG.intakeq.bookingUrl}\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nQuestions? Call 678-443-4000`).catch(() => {});
+  sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nIV Therapy: Our doctors personally administer all IV treatments. An IV evaluation consult is required prior to treatment (can be same day).\n\nIV options: Myers Cocktail, NAD+, Vitamin C, Glutathione, Iron Infusion, Chelation, Hydrogen Peroxide, Ozone, Ketamine, and more.\n\nBook your IV consult:\n${CONFIG.intakeq.bookingUrl}\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.\n\nQuestions? Call 678-443-4000`).catch(() => {});
   sendCallSummaryToStaff(callerPhone, `Reason: IV therapy inquiry\nSpeech: "${speech}"\nOutcome: Booking link sent`).catch(() => {});
   const g = gather(twiml, '/appt-schedule-confirm', { input: 'speech', speechTimeout: '3', timeout: 12 });
   say(g, "Would you like to go ahead and schedule your IV evaluation today?");
@@ -4697,7 +4697,7 @@ app.post('/appt-schedule-confirm', (req, res) => {
     twiml.redirect('/appt-patient-type');
   } else {
     say(twiml, `No problem at all! Whenever you are ready, you can book online any time at Taylor Medical Group dot net — just click Book Now. I am also texting you the link right now. Is there anything else I can help you with today?`);
-    sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nBook Your IV Evaluation online 24/7:\n${CONFIG.intakeq.bookingUrl}\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nQuestions? Call 678-443-4000`).catch(() => {});
+    sendSms(callerPhone, `TMG Phone Receptionist — Taylor Medical Group\n\nBook Your IV Evaluation online 24/7:\n${CONFIG.intakeq.bookingUrl}\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.\n\nQuestions? Call 678-443-4000`).catch(() => {});
     const g = gather(twiml, '/main-intent', { input: 'speech', speechTimeout: '3', timeout: 10 });
     say(g, '');
     twiml.hangup();
@@ -4831,7 +4831,7 @@ app.post('/sms', async (req, res) => {
   const body = (req.body.Body || '').toLowerCase().trim();
   const twiml = new MessagingResponse();
   if (/portal|lab|result|login|prescription|refill/.test(body)) {
-    twiml.message(`TMG Phone Receptionist — Taylor Medical Group\n\nPatient Portal (labs, prescriptions, refills, messages):\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nQuestions? Call 678-443-4000`);
+    twiml.message(`TMG Phone Receptionist — Taylor Medical Group\n\nPatient Portal (labs, prescriptions, refills, messages):\n${CONFIG.intakeq.portalUrl}\n\nBook an appointment:\n${CONFIG.intakeq.bookingUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.\n\nQuestions? Call 678-443-4000`);
   } else if (/appoint|book|schedul/.test(body)) {
     twiml.message(`TMG Phone Receptionist — Taylor Medical Group\n\nBook an appointment online 24/7:\n${CONFIG.intakeq.bookingUrl}\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\nWe see patients Mon, Thu & Fri. Questions? Call 678-443-4000`);
   } else if (/cancel|reschedul/.test(body)) {
@@ -4841,7 +4841,7 @@ app.post('/sms', async (req, res) => {
   } else if (/hour|open|close/.test(body)) {
     twiml.message(`TMG Phone Receptionist — Taylor Medical Group\n\nHours:\nPatient appointments: Mon, Thu & Fri, 10am–5pm ET (Fri closes 3pm)\nOffice admin: Mon–Fri, 9am–5pm\n\nBook: ${CONFIG.intakeq.bookingUrl}\nPatient portal: ${CONFIG.intakeq.portalUrl}`);
   } else if (/price|cost|how much|fee/.test(body)) {
-    twiml.message(`TMG Phone Receptionist — Taylor Medical Group\n\nService Pricing — visit our booking page for current pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\nQuestions? Call 678-443-4000`);
+    twiml.message(`TMG Phone Receptionist — Taylor Medical Group\n\nService Pricing — visit our booking page for current pricing:\n${CONFIG.intakeq.bookingUrl}\n\nPatient portal: ${CONFIG.intakeq.portalUrl}\n\n📍 5901 Peachtree Dunwoody Rd, Bldg C, Suite C25\nSandy Springs, GA 30328\n\n⚠️ Per HIPAA regulations, we do not respond to patient emails. All communication is handled securely through the patient portal only.\n\n🚨 If you are experiencing a medical emergency, dial 911 or go to your nearest emergency room.\n\nQuestions? Call 678-443-4000`);
   } else {
     twiml.message(`TMG Phone Receptionist — Taylor Medical Group\n\nThank you for reaching out!\n\nBook an appointment: ${CONFIG.intakeq.bookingUrl}\nPatient portal: ${CONFIG.intakeq.portalUrl}\nWebsite: www.taylormedicalgroup.net\nCall: 678-443-4000 (Mon–Fri)`);
     escalateToStaff(from, 'SMS inquiry', body).catch(() => {});
