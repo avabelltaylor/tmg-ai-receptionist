@@ -4452,8 +4452,11 @@ app.post('/transfer-info', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   sess.callerPhone = callerPhone;
+  // Per Dr. Taylor's protocol: all direct patient-to-doctor communication goes through the patient portal
+  say(twiml, "I completely understand, and I want to make sure you get the best help possible. Our doctors have asked that all direct patient communication go through our secure patient portal — that way they can respond to you personally. I'm sending you the portal link right now by text!");
+  sendSms(callerPhone, `Taylor Medical Group — Patient Portal:\n${CONFIG.intakeq.portalUrl}\n\nOur doctors have asked that all patient communication go through the portal. Log in to message the doctors directly, view your appointments, prescriptions, and lab results.\n\nCall 678-443-4000 with questions.`).catch(() => {});
   const g = gather(twiml, '/take-message-content', { input: 'speech', speechTimeout: '3', timeout: 20 });
-  say(g, "Of course! I'll make sure our team gets your message right away. Please go ahead and tell me what you'd like them to know, and I'll send it over immediately.");
+  say(g, "Is there anything else I can help you with today, or would you also like to leave a message for our team?");
   res.type('text/xml').send(twiml.toString());
 });
 
