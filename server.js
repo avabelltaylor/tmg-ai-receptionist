@@ -112,6 +112,7 @@ const CONFIG = {
   ringcentral: {
     clientId: process.env.RC_CLIENT_ID,
     clientSecret: process.env.RC_CLIENT_SECRET,
+    jwt: process.env.RC_JWT,
     username: process.env.RC_USERNAME || '6784434000',
     password: process.env.RC_PASSWORD,
     extension: process.env.RC_EXTENSION || '101',
@@ -439,19 +440,34 @@ let _rcTokenExpiry = 0;
 
 async function getRcAccessToken() {
   if (_rcAccessToken && Date.now() < _rcTokenExpiry - 60000) return _rcAccessToken;
-  const { clientId, clientSecret, username, password, extension, server } = CONFIG.ringcentral;
-  if (!clientId || !clientSecret || !username || !password) {
-    console.warn('[RC SMS] Missing RC credentials — cannot obtain access token');
+  const { clientId, clientSecret, jwt, username, password, extension, server } = CONFIG.ringcentral;
+  if (!clientId || !clientSecret) {
+    console.warn('[RC SMS] Missing RC clientId/clientSecret — cannot obtain access token');
     return null;
   }
   try {
     const creds = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-    const params = new URLSearchParams({
-      grant_type: 'password',
-      username,
-      extension: extension || '',
-      password,
-    });
+    let params;
+    if (jwt) {
+      // JWT grant flow (preferred — works with JWT auth flow app setting)
+      params = new URLSearchParams({
+        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        assertion: jwt,
+      });
+      console.log('[RC SMS] Using JWT grant flow');
+    } else if (username && password) {
+      // Password grant fallback (legacy — may be disabled by RC)
+      params = new URLSearchParams({
+        grant_type: 'password',
+        username,
+        extension: extension || '',
+        password,
+      });
+      console.log('[RC SMS] Using password grant flow (legacy)');
+    } else {
+      console.warn('[RC SMS] No JWT or password credentials — cannot obtain token');
+      return null;
+    }
     const resp = await axios.post(
       `${server}/restapi/oauth/token`,
       params.toString(),
@@ -484,7 +500,7 @@ async function sendSms(to, body) {
 
   // ── Try RingCentral first ──────────────────────────────────────────────────
   const rcCfg = CONFIG.ringcentral;
-  if (rcCfg.clientId && rcCfg.clientSecret && rcCfg.password) {
+  if (rcCfg.clientId && rcCfg.clientSecret && (rcCfg.jwt || rcCfg.password)) {
     const token = await getRcAccessToken();
     if (token) {
       try {
