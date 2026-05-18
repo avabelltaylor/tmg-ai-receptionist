@@ -9,6 +9,41 @@ const twilio = require('twilio');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const { OpenAI } = require('openai');
+
+// ─── Whisper transcription helper ─────────────────────────────────────────────
+// Downloads the Twilio recording and transcribes it via OpenAI Whisper.
+// Returns the full transcript text, or null if unavailable.
+async function transcribeCallRecording(recordingSid) {
+  if (!recordingSid) return null;
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) { console.warn('[WHISPER] OPENAI_API_KEY not set — skipping transcription'); return null; }
+  const tmpPath = path.join('/tmp', `rec_${recordingSid}.mp3`);
+  try {
+    // Download the recording from Twilio
+    const mp3Url = `https://api.twilio.com/2010-04-01/Accounts/${CONFIG.twilio.accountSid}/Recordings/${recordingSid}.mp3`;
+    const recResp = await axios({
+      method: 'GET', url: mp3Url,
+      auth: { username: CONFIG.twilio.accountSid, password: CONFIG.twilio.authToken },
+      responseType: 'arraybuffer', timeout: 30000
+    });
+    fs.writeFileSync(tmpPath, recResp.data);
+    // Transcribe with Whisper
+    const openai = new OpenAI({ apiKey });
+    const transcription = await openai.audio.transcriptions.create({
+      file: fs.createReadStream(tmpPath),
+      model: 'whisper-1',
+      language: 'en',
+      prompt: 'This is a phone call between a medical receptionist named Taylor and a patient calling Taylor Medical Group in Atlanta, Georgia.'
+    });
+    fs.unlinkSync(tmpPath);
+    return transcription.text || null;
+  } catch (err) {
+    console.error('[WHISPER] Transcription failed:', err.message);
+    try { if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath); } catch (_) {}
+    return null;
+  }
+}
 const app = express();
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
@@ -924,7 +959,7 @@ function checkEscape(speech, sess, opts = {}) {
   }
 
   // --- 6. Frustration threshold reached ---
-  if ((sess.frustrationCount || 0) >= 3) {
+  if ((sess.frustrationCount || 0) >= 2) {
     return { action: 'escalate', reason: 'frustration threshold reached' };
   }
 
@@ -1036,7 +1071,7 @@ function clearSession(callSid) { delete sessions[callSid]; }
 // Returns true if threshold reached (caller should be escalated)
 function incrementFrustration(sess) {
   sess.frustrationCount = (sess.frustrationCount || 0) + 1;
-  return sess.frustrationCount >= 3;
+  return sess.frustrationCount >= 2;
 }
 
 // Build escalation TwiML — collect contact info first, then offer message or portal
@@ -1250,16 +1285,46 @@ app.post('/intake-firstname', (req, res) => {
   const twiml = new VoiceResponse();
   const sess = getSession(callSid);
   // Filter out filler phrases that are not names
-  const FILLER_PHRASES = /^(hi|hello|hey|hi there|hello there|good morning|good afternoon|good evening|thank you|thanks|sure|okay|ok|yes|yeah|yep|uh huh|um|uh|hmm|oh|oh hi|oh hello|oh okay|oh sure)([\.\!\?\,]?\s*.*)?$/i;
+  const FILLER_PHRASES = /^(hi|hello|hey|hi there|hello there|good morning|good afternoon|good evening|thank you|thanks|sure|okay|ok|yes|yeah|yep|uh huh|um|uh|hmm|oh|oh hi|oh hello|oh okay|oh sure)([.!?,]?\s*.*)?$/i;
   if (!speech || speech.length < 2 || FILLER_PHRASES.test(speech.trim())) {
     const g = gather(twiml, '/intake-firstname', { input: 'speech', speechTimeout: '2', timeout: 15 });
     say(g, "I'd love to help! Could you please tell me your first and last name?");
     return res.type('text/xml').send(twiml.toString());
   }
-  // Store spoken name, then ask them to spell it for accuracy
-  sess.spokenName = speech;
-  const g = gather(twiml, '/intake-spell-name', { input: 'speech', speechTimeout: '3', timeout: 15 });
-  say(g, "Thank you so much! Just to make sure I have your name exactly right, could you spell your first name for me, one letter at a time?");
+  // Strip filler words and clean up
+  const cleaned = speech
+    .replace(/\b(my name is|i am|this is|it's|its|um|uh|hmm|like|so|well)\b/gi, '')
+    .replace(/[^a-zA-Z '-]/g, '')
+    .trim();
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  // If caller gave both first and last name (2+ real words, each 2+ letters), split immediately
+  const realWords = words.filter(w => w.length >= 2);
+  if (realWords.length >= 2) {
+    // First word = first name, rest = last name
+    const firstName = realWords[0].charAt(0).toUpperCase() + realWords[0].slice(1).toLowerCase();
+    const lastName = realWords.slice(1).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+    sess.firstName = firstName;
+    sess.lastName = lastName;
+    sess._pendingFirstName = firstName;
+    sess._pendingLastName = lastName;
+    sess.pronouncedName = firstName;
+    // Confirm the full name directly — skip spelling loop
+    const fullName = `${firstName} ${lastName}`;
+    const g = gather(twiml, '/intake-confirm-fullname', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    say(g, `Nice to meet you! I have your name as ${fullName} — is that correct?`);
+    return res.type('text/xml').send(twiml.toString());
+  }
+  // Single word — ask for last name directly
+  if (realWords.length === 1) {
+    const firstName = realWords[0].charAt(0).toUpperCase() + realWords[0].slice(1).toLowerCase();
+    sess._pendingFirstName = firstName;
+    const g = gather(twiml, '/intake-spell-lastname', { input: 'speech', speechTimeout: '3', timeout: 15 });
+    say(g, `Thank you! And could you spell your last name for me, one letter at a time?`);
+    return res.type('text/xml').send(twiml.toString());
+  }
+  // Fallback — couldn't parse, ask again
+  const g = gather(twiml, '/intake-firstname', { input: 'speech', speechTimeout: '2', timeout: 15 });
+  say(g, "I'd love to help! Could you please tell me your first and last name?");
   res.type('text/xml').send(twiml.toString());
 });
 
@@ -1273,6 +1338,42 @@ app.post('/intake-spell-name', (req, res) => {
     say(g, pick(RETRY_PROMPTS) + " Could you spell your first name for me, one letter at a time?");
     return res.type('text/xml').send(twiml.toString());
   }
+  const words = speech.toLowerCase().replace(/[^a-z ]/g, '').trim().split(/\s+/).filter(Boolean);
+  const singleLetterCount = words.filter(w => w.length === 1).length;
+  const isSpelled = words.length > 1 && (words.every(w => w.length === 1) || singleLetterCount >= words.length * 0.6);
+  // If caller spelled a long sequence (>8 letters), they likely spelled both first AND last name
+  // Use the spokenName hint to figure out where to split
+  if (isSpelled) {
+    const joined = words.join('');
+    const spokenName = (sess.spokenName || '').trim();
+    const spokenWords = spokenName.replace(/[^a-zA-Z ]/g, '').trim().split(/\s+/).filter(w => w.length >= 2);
+    let firstName, lastName;
+    if (spokenWords.length >= 2 && joined.length > spokenWords[0].length) {
+      // Split at the length of the spoken first name
+      const splitAt = spokenWords[0].length;
+      const firstRaw = joined.slice(0, splitAt);
+      const lastRaw = joined.slice(splitAt);
+      if (firstRaw.length >= 2 && lastRaw.length >= 2) {
+        firstName = firstRaw.charAt(0).toUpperCase() + firstRaw.slice(1).toLowerCase();
+        lastName = lastRaw.charAt(0).toUpperCase() + lastRaw.slice(1).toLowerCase();
+        sess.firstName = firstName;
+        sess.lastName = lastName;
+        sess._pendingFirstName = firstName;
+        sess._pendingLastName = lastName;
+        sess.pronouncedName = firstName;
+        const g = gather(twiml, '/intake-confirm-fullname', { input: 'speech', speechTimeout: '3', timeout: 12 });
+        say(g, `I have your name as ${firstName} ${lastName} — is that correct?`);
+        return res.type('text/xml').send(twiml.toString());
+      }
+    }
+    // Couldn't split — treat entire spelled sequence as first name only
+    firstName = joined.charAt(0).toUpperCase() + joined.slice(1).toLowerCase();
+    sess._pendingFirstName = firstName;
+    const g = gather(twiml, '/intake-confirm-firstname', { input: 'speech', speechTimeout: '3', timeout: 12 });
+    say(g, `I have your first name as ${firstName} — is that correct?`);
+    return res.type('text/xml').send(twiml.toString());
+  }
+  // Not spelled — treat as spoken name, use normalizeName
   const parsedFirst = normalizeName(speech);
   const cleanFirst = parsedFirst.includes(' ') ? parsedFirst.split(' ')[0] : parsedFirst;
   sess._pendingFirstName = cleanFirst;
@@ -4261,6 +4362,25 @@ app.post('/clinic/status', (req, res) => {
             } catch (e) {
               console.warn('[STATUS] Could not fetch recording from API:', e.message);
             }
+          }
+
+          // ─── Whisper transcription ────────────────────────────────────────────────────────────
+          // Always transcribe the recording via Whisper so staff get the full
+          // conversation in the email — regardless of in-memory transcript state.
+          const finalSess = sessions[callSid] || {};
+          const whisperText = await transcribeCallRecording(finalSess.recordingSid);
+          if (whisperText) {
+            const whisperPlain = `\n\n🎤 WHISPER RECORDING TRANSCRIPT:\n${whisperText}`;
+            const whisperHtml = `
+              <div style="background:#fffaf0;border:1px solid #f6ad55;border-radius:8px;padding:16px;margin-top:16px;">
+                <h3 style="margin:0 0 10px;font-size:14px;color:#c05621;">🎤 Full Call Transcript (Whisper)</h3>
+                <p style="font-size:13px;color:#4a5568;white-space:pre-wrap;">${whisperText.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</p>
+              </div>`;
+            transcriptText = transcriptText + whisperPlain;
+            transcriptHtml = transcriptHtml + whisperHtml;
+            console.log(`[WHISPER] Transcript added to staff email for ${callSid} (${whisperText.length} chars)`);
+          } else {
+            console.warn(`[WHISPER] No transcript available for ${callSid} — recording may be too short or key missing`);
           }
 
           await sendCallSummaryToStaff(
